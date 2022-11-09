@@ -1,0 +1,12 @@
+{
+  "or": [
+    {
+      "and": [
+        ["User-Name", "contains", "copy"],
+        ["NAS-IP-Address", "present"],
+        ["isSessionAccounting", "is", "true"]
+      ]
+    },
+    ["NAS-Port", "present"]
+  ]
+}
