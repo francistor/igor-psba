@@ -1,4 +1,4 @@
 {
     "bindAddress": "0.0.0.0",
-    "bindPort": 20001
+    "bindPort": 20000
 }

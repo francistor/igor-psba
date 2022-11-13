@@ -1,6 +1,4 @@
 
 [
-    {"nameRegex": "(.*txt)",  "base": "http://localhost:8100/"},
-	{"nameRegex": "Gy/(.*)",  "base": "resources/"},
     {"nameRegex": "(.*)",     "base": "resources/"}
 ]

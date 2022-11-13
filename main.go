@@ -2,16 +2,30 @@ package main
 
 import (
 	"flag"
-	"time"
+	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/francistor/igor/config"
 	"github.com/francistor/igor/handlerfunctions"
 	"github.com/francistor/igor/router"
+
+	psbahandler "github.com/francistor/igor-psba/psbahandlers"
 )
 
 func main() {
 
 	// defer profile.Start(profile.BlockProfile).Stop()
+
+	doneChan := make(chan struct{}, 1)
+	signalChan := make(chan os.Signal, 1)
+	go func() {
+		<-signalChan
+		close(doneChan)
+		fmt.Println("terminating server")
+	}()
+	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 
 	// Get the command line arguments
 	bootPtr := flag.String("boot", "resources/searchRules.json", "File or http URL with Configuration Search Rules")
@@ -20,20 +34,26 @@ func main() {
 	flag.Parse()
 
 	// Initialize the Config Object
-	config.InitPolicyConfigInstance(*bootPtr, *instancePtr, true)
+	ci := config.InitPolicyConfigInstance(*bootPtr, *instancePtr, true)
 
 	// Get logger
 	logger := config.GetLogger()
 
-	// Start Diameter
-	_ = router.NewDiameterRouter(*instancePtr, handlerfunctions.EmptyDiameterHandler)
-	logger.Info("Diameter router started")
-
 	// Start Radius
-	// _ = router.NewRadiusRouter(*instancePtr, handlerfunctions.TestRadiusAttributesHandler)
-	_ = router.NewRadiusRouter(*instancePtr, handlerfunctions.EmptyRadiusHandler)
+	r := router.NewRadiusRouter(*instancePtr, handlerfunctions.EmptyRadiusHandler)
 	logger.Info("Radius router started")
 
-	time.Sleep(1000 * time.Minute)
+	// Initialize handler. Reads configuration files
+	if err := psbahandler.InitHandler(ci, r); err != nil {
+		panic("could not initialize handler " + err.Error())
+	}
+	defer psbahandler.CloseHandler()
 
+	// Start server
+	r.Start()
+
+	<-doneChan
+
+	// Close router gracefully
+	r.Close()
 }

@@ -1,0 +1,5 @@
+{
+	"url": "francisco:francisco@tcp(n2:3306)/PSBA",
+	"driver": "mysql",
+	"numThreads": 10
+}
