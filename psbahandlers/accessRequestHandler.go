@@ -8,14 +8,7 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-func AccessRequestHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
-
-	var err error
-	logLines := make(instrumentation.LogLines, 0)
-
-	defer func(lines []instrumentation.LogLine) {
-		logLines.WriteWLog()
-	}(logLines)
+func AccessRequestHandler(request *radiuscodec.RadiusPacket, logLines instrumentation.LogLines) (*radiuscodec.RadiusPacket, error) {
 
 	// Find the user
 	client, err := findClient(logLines)
