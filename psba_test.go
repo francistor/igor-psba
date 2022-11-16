@@ -41,7 +41,9 @@ func TestMain(m *testing.M) {
 	clientHttpRouter = httprouter.NewHttpRouter("clientpsba", nil, clientRouter)
 
 	// Initialize handler
-	psbahandlers.InitHandler(serverCInstance, serverRouter)
+	if err := psbahandlers.InitHandler(serverCInstance, serverRouter); err != nil {
+		panic(err)
+	}
 
 	// Start routers
 	clientRouter.Start()
@@ -85,7 +87,7 @@ func TestSimpleRequest(t *testing.T) {
 		"packet": {
 			"Code": 1,
 			"AVPs":[
-				{"User-Name":"myusername@proxy"},
+				{"User-Name":"myusername@database.provision.preject_addon.pcautiv_addon.proxy"},
 				{"NAS-IP-Address": "150.0.0.1"},
 				{"NAS-Port": 1},
 				{"Igor-OctetsAttribute": "00"}	

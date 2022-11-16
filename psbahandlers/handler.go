@@ -25,14 +25,14 @@ var databaseConfig DatabaseConfig
 var dbHandle *sql.DB
 
 // Configuration files
-var globalConfig GlobalConfig
+var handlerConfig HandlerConfig
 var radiusClients config.RadiusClients
-var realmConfig handlerfunctions.RadiusUserFile
-var serviceConfig handlerfunctions.RadiusUserFile
+var realms handlerfunctions.RadiusUserFile
+var services handlerfunctions.RadiusUserFile
 var radiusChecks handlerfunctions.RadiusPacketChecks
 var radiusFilters handlerfunctions.AVPFilters
 
-var pwRegex = regexp.MustCompile("^([0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+):(([0-9]+)-)?([0-9]+)$")
+var pwRegex = regexp.MustCompile(`^([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+):(([0-9]+)-)?([0-9]+)$`)
 
 // Populates database config
 func InitHandler(ci *config.PolicyConfigurationManager, r *router.RadiusRouter) error {
@@ -58,7 +58,8 @@ func InitHandler(ci *config.PolicyConfigurationManager, r *router.RadiusRouter) 
 	}
 	err = dbHandle.Ping()
 	if err != nil {
-		return fmt.Errorf("could not ping database %w", err)
+		// Just log. The database may be available later
+		config.GetLogger().Warnf("could not ping database %s %s", databaseConfig.Driver, databaseConfig.Url)
 	}
 
 	////////////////////////////////////////////////////////////////////////
@@ -69,7 +70,7 @@ func InitHandler(ci *config.PolicyConfigurationManager, r *router.RadiusRouter) 
 	if err != nil {
 		return fmt.Errorf("could not read globalConfig.json %w", err)
 	}
-	err = json.Unmarshal(gJson, &globalConfig)
+	err = json.Unmarshal(gJson, &handlerConfig)
 	if err != nil {
 		return fmt.Errorf("could not unmarshal globalConfig.json %w", err)
 	}
@@ -78,19 +79,19 @@ func InitHandler(ci *config.PolicyConfigurationManager, r *router.RadiusRouter) 
 	radiusClients = ci.RadiusClientsConf()
 
 	// Realm config
-	realmConfig, err = handlerfunctions.NewRadiusUserFile("realmConfig.json", ci)
+	realms, err = handlerfunctions.NewRadiusUserFile("realms.json", ci)
 	if err != nil {
 		return fmt.Errorf("could not get realm configuration %w", err)
 	}
 
 	// Service configuration
-	serviceConfig, err = handlerfunctions.NewRadiusUserFile("serviceConfig.json", ci)
+	services, err = handlerfunctions.NewRadiusUserFile("services.json", ci)
 	if err != nil {
 		return fmt.Errorf("could not get service configuration.json %w", err)
 	}
 
 	// Radius Checks
-	radiusChecks, err = handlerfunctions.NewRadiusChecks("radiusChecks.json", ci)
+	radiusChecks, err = handlerfunctions.NewRadiusPacketChecks("radiusChecks.json", ci)
 	if err != nil {
 		return fmt.Errorf("could not get radius checks %w", err)
 	}
@@ -122,6 +123,7 @@ func RequestHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacke
 
 	if config.IsDebugEnabled() {
 		logLines.WLogEntry(config.LEVEL_DEBUG, "")
+		logLines.WLogEntry(config.LEVEL_DEBUG, ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
 		logLines.WLogEntry(config.LEVEL_DEBUG, "starting processing radius packet")
 		logLines.WLogEntry(config.LEVEL_DEBUG, request.String())
 	}
@@ -139,7 +141,7 @@ func RequestHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacke
 	} else {
 		radiusClientType = "DEFAULT"
 	}
-	fmt.Println(radiusClientType)
+	logLines.WLogEntry(config.LEVEL_DEBUG, "radius client type: %s", radiusClientType)
 
 	// Normalize request data
 	var userName = strings.ToLower(request.GetStringAVP("User-Name"))
@@ -148,7 +150,8 @@ func RequestHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacke
 	if len(userNameComponents) > 1 {
 		realm = userNameComponents[1]
 	}
-	fmt.Println(realm)
+	logLines.WLogEntry(config.LEVEL_DEBUG, "realm: %s", realm)
+
 	var macAddress = ""
 	if addr := request.GetStringAVP("Huawei-User-MAC"); addr != "" {
 		macAddress = addr
@@ -159,6 +162,11 @@ func RequestHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacke
 	} else if addr := request.GetCiscoAVPair("macaddress"); addr != "" {
 		// TODO: Correct this!
 		macAddress = addr
+	}
+
+	// Add attribute to request
+	if macAddress != "" {
+		request.Add("PSA-MAC-Address", macAddress)
 	}
 
 	// Get the AccessPort and AccessId
@@ -180,28 +188,53 @@ func RequestHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacke
 		if err != nil {
 			logLines.WLogEntry(config.LEVEL_ERROR, "Bad cvlan: %s", cvlan)
 		}
-		accessId = dslamIPAddr
 		accessPort = svlanInt*4096 + cvlanInt
+		accessId = dslamIPAddr
+		logLines.WLogEntry(config.LEVEL_DEBUG, "access line with pseudowire format. port %d - accessId %s", accessPort, accessId)
 	}
 
 	// If the above did not produce a result
 	if accessId == "" {
 		accessPort = request.GetIntAVP("NAS-Port")
 		accessId = request.GetStringAVP("NAS-IP-Address")
+		logLines.WLogEntry(config.LEVEL_DEBUG, "access line with nasport/nasip format. port %d - accessId %s", accessPort, accessId)
 	}
 
-	/*
+	// Push attribute with real NAS-IP-Address, if availble
+	var nasipAddr string
+	if v, err := request.GetAVP("NAS-IP-Address"); err == nil {
+		request.AddAVP(&v)
+		nasipAddr = v.GetString()
+	}
 
-	   // Add synthetic attribute with real NAS-IP-Address
-	   request >> "NAS-IP-Address" match {
-	     case Some(nasIpAddressAVP) => request << ("PSA-BRAS-NAS-IP-Address", nasIpAddressAVP.stringValue)
-	     case _ =>
-	   }
+	// Merge the configuration. Priority is realm > client > global
+	var clientConfig handlerfunctions.Properties = radiusClients[nasipAddr].ClientProperties
+	var realmConfig handlerfunctions.Properties = realms[realm].ConfigItems
+	requestConfig := handlerConfig.OverrideWith(clientConfig.OverrideWith(realmConfig), &logLines)
 
-	   // Priorities Client --> Realm --> Global
-	   val jConfig = jGlobalConfig.merge(jRealmConfig.forKey(realm, "DEFAULT")).
-	     merge(jRadiusClientConfig.forKey(nasIpAddress, "DEFAULT"))
-	*/
+	if config.IsDebugEnabled() {
+		logLines.WLogEntry(config.LEVEL_DEBUG, "global config: %s", handlerConfig)
+		logLines.WLogEntry(config.LEVEL_DEBUG, "realm config: %s", realmConfig)
+		logLines.WLogEntry(config.LEVEL_DEBUG, "client config: %s", clientConfig)
+		logLines.WLogEntry(config.LEVEL_DEBUG, "merged config: %s", requestConfig)
+	}
+
+	// Merge the reply attributes. Priority is realm > global
+	// TODO: Get attributes from radius client
+	var radiusAttributes handlerfunctions.AVPItems = handlerConfig.RadiusAttrs
+	radiusAttributes = radiusAttributes.OverrideWith(realms[realm].ReplyItems)
+
+	var noRadiusAttributes handlerfunctions.AVPItems = handlerConfig.NonOverridableRadiusAttrs
+	noRadiusAttributes = realms[realm].NonOverridableReplyItems.Add(handlerConfig.NonOverridableRadiusAttrs)
+
+	if config.IsDebugEnabled() {
+		logLines.WLogEntry(config.LEVEL_DEBUG, "handler attributes: %s", handlerConfig.RadiusAttrs)
+		logLines.WLogEntry(config.LEVEL_DEBUG, "realm attributes: %s", realms[realm].ReplyItems)
+		logLines.WLogEntry(config.LEVEL_DEBUG, "merged attributes: %s", radiusAttributes)
+		logLines.WLogEntry(config.LEVEL_DEBUG, "no-handler attributes: %s", handlerConfig.NonOverridableRadiusAttrs)
+		logLines.WLogEntry(config.LEVEL_DEBUG, "no-realm attributes: %s", realms[realm].NonOverridableReplyItems)
+		logLines.WLogEntry(config.LEVEL_DEBUG, "no-merged attributes: %s", noRadiusAttributes)
+	}
 
 	// Call the corresponding handler
 	switch request.Code {

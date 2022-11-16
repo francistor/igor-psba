@@ -373,6 +373,11 @@
             "attributes":
             [
                 {
+                    "code": 1,
+                    "name": "Virtual-Router",
+                    "type": "String"
+                },
+                {
                     "code": 31,
                     "name": "Service-Bundle",
                     "type": "String"

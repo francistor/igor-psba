@@ -1,0 +1,48 @@
+{
+	"provisiontype.authtype.reject_addon.block_addon.proxy":{
+		"configItems":{
+			"provisionType": "database",
+			"authLocal": "provision",
+
+			"useRejectService": "true",
+			"rejectIsAddon": "true",
+			"rejectServiceName": "preject",
+
+			"blockingWithService": "true",
+			"blockingServiceName": "pcautiv",
+			"blockingIsAddon": "true",
+
+			"writeServiceCDR": "yes",
+			"writeSessionCDR": "yes",
+
+			"authProxyFilterOut": "filters/altAuthFilterOut.json"
+		}
+	},
+
+	"database.provision.preject_addon.pcautiv_addon.proxy":{
+		"configItems": {
+			"provisionType": "database",
+			"authLocal": "provision",
+
+			"useRejectService": "true",
+			"rejectIdAddon": "true",
+			"rejectServiceName": "preject",
+
+			"blockingWithService": "true",
+			"blockingServiceName": "pcautiv",
+			"blockingIsAddon": "true",
+
+			"writeServiceCDR": "true",
+			"writeSessionCDR": "true",
+
+			"authProxyFilterOut": "filters/altAuthFilterOut.json"
+		},
+		"replyItems": [
+			{"Unisphere-Virtual-Router": "vrouter-1"}
+		],
+		"nonOverridableReplyItems": [
+			{"Cisco-AVPair": "realm=database.provision.preject_addon.pcautiv_addon.proxy"}
+		]
+	}
+
+}

@@ -16,26 +16,53 @@
 			"filenamePattern": "cdr_%d{yyyyMMdd}.txt"
 		}
 	],
-	"writeSessionCDR": true,
-	"writeServiceCDR": true,
+	"writeSessionCDR": false,
+	"writeServiceCDR": false,
 	"cdrFilenamePattern": "cdr_%d{yyyyMMdd}.txt",
-	"provisionType": "database",
-	"authLocal": "provision",
-	"sendReject": "yes",
-	"rejectServiceName": "reject",
-	"blockingServiceName": "pcautiv",
-	"rejectFilter": "portal",
-	"proxyTimeoutMillis": 500,
-	"proxyRetries": 1,
+
+	"sessionAccountingCopyTargets":[
+		{
+			"targetName": "session-target-1",
+			"RadiusGroupName": "psba-superserver-group",
+			"CheckerName": "checkSessionAccounting",
+			"FilterName": "filters/passAll.json"
+		}
+	],
+
+	"serviceAccountingCopyTargets":[
+		{
+			"targetName": "service-target-1",
+			"RadiusGroupName": "psba-superserver-group",
+			"CheckerName": "checkServiceAccounting",
+			"FilterName": "filters/passAll.json"
+		}
+	],
+
+	"proxyGroupName": "",
 	"acceptOnProxyError": false,
-	"inlineProxyGroupName": "yaas-superserver-group",
-	"proxySessionAccounting": true,
+	"proxySessionAccounting": false,
 	"proxyServiceAccounting": false,
 	"authProxyFilterOut": "filters/standardProxyFilterOut.json",
 	"authProxyFilterIn": "filters/standardProxyFilterIn.json",
 	"acctProxyFilterOut": "filters/standardProxyFilterOut.json",
+	"proxyTimeoutMillis": 500,
+	"proxyRetries": 1,
+
+	"provisionType": "file",
+	"authLocal": "none",
+
+	"useRejectService": false,
+	"rejectServiceName": "void",
+	"rejectIsAddon": false,
+
+	"blockingWithService": false,
+	"blockingServiceName": "void",
+	"blockingIsAddon": false,
+
 	"radiusAttrs":[
 		{"Session-Timeout": 3600}
 	],
-	"nonOverridableRadiusAttrs": []
+	"nonOverridableRadiusAttrs": [
+		{"Cisco-AVPair": "global=true"}
+	]
 }
