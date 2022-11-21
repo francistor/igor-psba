@@ -1,0 +1,6 @@
+{
+    "sessionAccounting":
+        ["PSA-ServiceName", "notpresent"],
+    "serviceAccounting":
+        ["PSA-ServiceName", "present"]
+}

@@ -3,15 +3,15 @@ module github.com/francistor/igor-psba
 go 1.19
 
 require (
-	github.com/francistor/igor v0.0.0-20221116192717-b281491665c2
+	github.com/francistor/igor v0.0.0-20221121134643-799fb698f1ab
 	github.com/go-sql-driver/mysql v1.6.0
-	go.uber.org/zap v1.23.0
 	golang.org/x/net v0.2.0
 )
 
 require (
 	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
+	go.uber.org/zap v1.23.0 // indirect
 	golang.org/x/exp v0.0.0-20221111204811-129d8d6c17ab // indirect
 	golang.org/x/text v0.4.0 // indirect
 )

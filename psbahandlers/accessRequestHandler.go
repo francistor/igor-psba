@@ -1,59 +1,157 @@
 package psbahandlers
 
 import (
-	"fmt"
+	"database/sql"
 
-	"github.com/francistor/igor/instrumentation"
+	"github.com/francistor/igor/config"
 	"github.com/francistor/igor/radiuscodec"
-	"go.uber.org/zap/zapcore"
 )
 
-func AccessRequestHandler(request *radiuscodec.RadiusPacket, logLines instrumentation.LogLines) (*radiuscodec.RadiusPacket, error) {
+func AccessRequestHandler(request *radiuscodec.RadiusPacket, ctx *RequestContext, hl *config.HandlerLogger) (*radiuscodec.RadiusPacket, error) {
+
+	l := hl.L
 
 	// Find the user
-	client, err := findClient(logLines)
+	clientpou, err := findClient(ctx.userName, ctx.accessPort, ctx.accessId, hl)
 	if err != nil {
 		// No answer
 		return nil, err
 	}
 
-	if client.ClientId != 0 {
-		fmt.Printf("client found %#v\n", client)
+	if clientpou.ClientId != 0 {
+		l.Debugf("client found %#v\n", clientpou)
+		l.Debug(clientpou.NotificationExpDate.Format("2006-01-02T15:04:05 MST"))
 	} else {
-		fmt.Printf("client not found\n")
+		l.Debug("client not found\n")
 	}
 
-	resp := radiuscodec.NewRadiusResponse(request, true)
+	response := radiuscodec.NewRadiusResponse(request, true)
 
 	// Echo all attributes
 	for i := range request.AVPs {
-		resp.AddAVP(&request.AVPs[i])
+		response.AddAVP(&request.AVPs[i])
 	}
 
-	return resp, nil
+	return response, nil
+}
+
+type NullableClientPoU struct {
+	ClientId                    int
+	ExternalClientId            string
+	ISP                         sql.NullString
+	PlanName                    string
+	BlockingStatus              int
+	PlanOverride                sql.NullString
+	PlanOverrideExpDate         sql.NullTime
+	AddonProfileOverride        sql.NullString
+	AddonProfileOverrideExpDate sql.NullTime
+	NotificationExpDate         sql.NullTime
+	AccessPort                  sql.NullInt64
+	AccessId                    sql.NullString
+	UserName                    sql.NullString
+	Password                    sql.NullString
+	IPv4Address                 sql.NullString
+	IPv6DelegatedPrefix         sql.NullString
+	IPv6WANPrefix               sql.NullString
+	AccessType                  sql.NullInt32
+	CheckType                   sql.NullInt32
+}
+
+func (p *NullableClientPoU) toPoU() ClientPoU {
+	clientPoU := ClientPoU{
+		ClientId:                    p.ClientId,
+		ExternalClientId:            p.ExternalClientId,
+		ISP:                         p.ISP.String,
+		PlanName:                    p.PlanName,
+		BlockingStatus:              p.BlockingStatus,
+		PlanOverride:                p.PlanOverride.String,
+		PlanOverrideExpDate:         p.PlanOverrideExpDate.Time,
+		AddonProfileOverride:        p.AddonProfileOverride.String,
+		AddonProfileOverrideExpDate: p.AddonProfileOverrideExpDate.Time,
+		NotificationExpDate:         p.NotificationExpDate.Time,
+		AccessPort:                  p.AccessPort.Int64,
+		AccessId:                    p.AccessId.String,
+		UserName:                    p.UserName.String,
+		Password:                    p.Password.String,
+		IPv4Address:                 p.IPv4Address.String,
+		IPv6DelegatedPrefix:         p.IPv6DelegatedPrefix.String,
+		IPv6WANPrefix:               p.IPv6WANPrefix.String,
+		AccessType:                  int(p.AccessType.Int32),
+		CheckType:                   int(p.CheckType.Int32),
+	}
+
+	return clientPoU
 }
 
 // Helper function to get the client from the database
-func findClient(logLines instrumentation.LogLines) (Client, error) {
+func findClient(userName string, accessPort int64, accessId string, hl *config.HandlerLogger) (ClientPoU, error) {
+
+	l := hl.L
+
 	// Find the user
-	client := Client{}
-	rows, err := dbHandle.Query("select ClientId, ExternalClientId, PlanName from clients where ExternalClientId = ?", 3)
+	clientpou := NullableClientPoU{}
+	stmt, err := dbHandle.Prepare(`select 
+	clients.ClientId, 
+	ExternalClientId, 
+	ISP, 
+	PlanName, 
+	BlockingStatus, 
+	PlanOverride, 
+	PlanOverrideExpDate, 
+	AddonProfileOverride, 
+	AddonProfileOverrideExpDate, 
+	NotificationExpDate,
+	AccessPort,
+	AccessId,
+	UserName,
+	Password,
+	IPv4Address,
+	IPv6DelegatedPrefix,
+	IPv6WANPrefix,
+	AccessType,
+	CheckType
+	from clients, pou where clients.ClientId = pou.ClientId and accessId = ? and accessPort = ?`)
 	if err != nil {
-		logLines.WLogEntry(zapcore.ErrorLevel, err.Error())
-		return client, err
+		l.Error(err.Error())
+		return ClientPoU{}, err
 	}
+	rows, err := stmt.Query(accessId, accessPort)
+	if err != nil {
+		return ClientPoU{}, err
+	}
+	defer rows.Close()
 	for rows.Next() {
-		err := rows.Scan(&client.ClientId, &client.ExternalClientId, &client.PlanName)
+		err := rows.Scan(
+			&clientpou.ClientId,
+			&clientpou.ExternalClientId,
+			&clientpou.ISP,
+			&clientpou.PlanName,
+			&clientpou.BlockingStatus,
+			&clientpou.PlanOverride,
+			&clientpou.PlanOverrideExpDate,
+			&clientpou.AddonProfileOverride,
+			&clientpou.AddonProfileOverrideExpDate,
+			&clientpou.NotificationExpDate,
+			&clientpou.AccessPort,
+			&clientpou.AccessId,
+			&clientpou.UserName,
+			&clientpou.Password,
+			&clientpou.IPv4Address,
+			&clientpou.IPv6DelegatedPrefix,
+			&clientpou.IPv6WANPrefix,
+			&clientpou.AccessType,
+			&clientpou.CheckType,
+		)
 		if err != nil {
-			logLines.WLogEntry(zapcore.ErrorLevel, err.Error())
-			return client, err
+			l.Error(err.Error())
+			return ClientPoU{}, err
 		}
 	}
 	err = rows.Err()
 	if err != nil {
-		logLines.WLogEntry(zapcore.ErrorLevel, err.Error())
-		return client, err
+		l.Error(err.Error())
+		return ClientPoU{}, err
 	}
 
-	return client, nil
+	return clientpou.toPoU(), nil
 }

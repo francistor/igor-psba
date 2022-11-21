@@ -3,34 +3,56 @@ package psbahandlers
 import "time"
 
 type Client struct {
-	ClientId                       int
-	ExternalClientId               string
-	ContractId                     string
-	PersonalId                     string
-	SecondaryId                    string
-	ISP                            string
-	BillingCycle                   int
-	PlanName                       string
-	BlockingStatus                 int
-	PlanOverride                   string
-	PlanOverrideExpDateUTC         time.Time
-	AddonProfileOverride           string
-	AddonProfileOverrideExpDateUTC time.Time
-	NotificationExpDateUTC         time.Time
+	ClientId                    int
+	ExternalClientId            string
+	ContractId                  string
+	PersonalId                  string
+	SecondaryId                 string
+	ISP                         string
+	BillingCycle                int
+	PlanName                    string
+	BlockingStatus              int
+	PlanOverride                string
+	PlanOverrideExpDate         time.Time
+	AddonProfileOverride        string
+	AddonProfileOverrideExpDate time.Time
+	NotificationExpDate         time.Time
 }
 
 type PoU struct {
 	PoUId               int
-	ClientId            int
-	AccessPort          int
+	ClientIdRef         int
+	AccessPort          int64
 	AccessId            string
 	UserName            string
 	Password            string
 	IPv4Address         string
-	IPv4DelegatedPrefix string
+	IPv6DelegatedPrefix string
 	IPv6WANPrefix       string
 	AccessType          int
 	CheckType           int
+}
+
+type ClientPoU struct {
+	ClientId                    int
+	ExternalClientId            string
+	ISP                         string
+	PlanName                    string
+	BlockingStatus              int
+	PlanOverride                string
+	PlanOverrideExpDate         time.Time
+	AddonProfileOverride        string
+	AddonProfileOverrideExpDate time.Time
+	NotificationExpDate         time.Time
+	AccessPort                  int64
+	AccessId                    string
+	UserName                    string
+	Password                    string
+	IPv4Address                 string
+	IPv6DelegatedPrefix         string
+	IPv6WANPrefix               string
+	AccessType                  int
+	CheckType                   int
 }
 
 /*
@@ -39,9 +61,9 @@ type PoU struct {
 -- Deleted clients do not exist here
 -- You may remove all PoU for a client if resources need to be freed but the client record is needed
 -- Campaing management is performed externally. Here, only a mark stating whether the user should be redirected to the
--- captive portal is used (NotificationExpDateUTC)
+-- captive portal is used (NotificationExpDate)
 CREATE TABLE IF NOT EXISTS clients (
-    ClientId INT AUTO_INCREMENT PRIMARY KEY,
+    Id INT AUTO_INCREMENT PRIMARY KEY,
     ExternalClientId VARCHAR(64) NOT NULL,
     ContractId VARCHAR(64),
     PersonalId VARCHAR(64),
@@ -51,10 +73,10 @@ CREATE TABLE IF NOT EXISTS clients (
     PlanName VARCHAR(32) NOT NULL,
     BlockingStatus INT NOT NULL,
     PlanOverride VARCHAR(64),
-    PlanOverrideExpDateUTC TIMESTAMP,
+    PlanOverrideExpDate TIMESTAMP,
     AddonProfileOverride VARCHAR(64),
-    AddonProfileOverrideExpDateUTC TIMESTAMP,
-    NotificationExpDateUTC TIMESTAMP    -- Client in a campaign will have a not null value
+    AddonProfileOverrideExpDate TIMESTAMP,
+    NotificationExpDate TIMESTAMP    -- Client in a campaign will have a not null value
 );
 
 
@@ -74,7 +96,7 @@ CREATE TABLE IF NOT EXISTS clientparameters (
     ClientId INT REFERENCES Clients(ClientId),
     ParameterName VARCHAR(64) NOT NULL REFERENCES clientParametersDef(parameterName),
     ParameterValue VARCHAR(64),
-    ExpDateUTC TIMESTAMP,
+    ExpDate TIMESTAMP,
     PRIMARY KEY (clientId, parameterName)
 );
 

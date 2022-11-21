@@ -64,6 +64,10 @@ func TestMain(m *testing.M) {
 		http2Client: http2Client,
 	}
 
+	// Clean cdr files
+	os.RemoveAll(os.Getenv("IGOR_BASE") + "/cdr/session")
+	os.RemoveAll(os.Getenv("IGOR_BASE") + "/cdr/service")
+
 	// Execute the tests
 	exitCode := m.Run()
 
@@ -78,7 +82,7 @@ func TestMain(m *testing.M) {
 	os.Exit(exitCode)
 }
 
-func TestSimpleRequest(t *testing.T) {
+func TestSimpleAccessRequest(t *testing.T) {
 
 	// Build the request packet
 	jRadiusRequest := `
@@ -88,7 +92,7 @@ func TestSimpleRequest(t *testing.T) {
 			"Code": 1,
 			"AVPs":[
 				{"User-Name":"myusername@database.provision.preject_addon.pcautiv_addon.proxy"},
-				{"NAS-IP-Address": "150.0.0.1"},
+				{"NAS-IP-Address": "127.0.0.1"},
 				{"NAS-Port": 1},
 				{"Igor-OctetsAttribute": "00"}	
 			]
@@ -99,8 +103,63 @@ func TestSimpleRequest(t *testing.T) {
 	}
 	`
 	checks := []TestCheck{
-		{"avp is", "User-Name", "myusername@proxy"},
+		{"avp is", "User-Name", "myusername@database.provision.preject_addon.pcautiv_addon.proxy"},
 		{"avp is", "Igor-OctetsAttribute", "00"},
+	}
+	testInvoker.testCase(t, "simple access request", jRadiusRequest, checks)
+}
+
+func TestSimpleSessionAccountingRequest(t *testing.T) {
+
+	// Build the request packet
+	jRadiusRequest := `
+	{
+		"destination": "psba-server-group",
+		"packet": {
+			"Code": 4,
+			"AVPs":[
+				{"User-Name":"myusername@database.provision.preject_addon.pcautiv_addon.proxy"},
+				{"NAS-IP-Address": "127.0.0.1"},
+				{"NAS-Port": 1},
+				{"Igor-OctetsAttribute": "00"},
+				{"Acct-Status-Type": "Start"}	
+			]
+		},
+		"perRequestTimeoutSpec": "1s",
+		"tries": 1,
+		"serverTries": 1
+	}
+	`
+	checks := []TestCheck{
+		{"code is", "", "5"},
+	}
+	testInvoker.testCase(t, "simple session accounting", jRadiusRequest, checks)
+}
+
+func TestSimpleServiceAccountingRequest(t *testing.T) {
+
+	// Build the request packet
+	jRadiusRequest := `
+	{
+		"destination": "psba-server-group",
+		"packet": {
+			"Code": 4,
+			"AVPs":[
+				{"User-Name":"myusername@database.provision.preject_addon.pcautiv_addon.proxy"},
+				{"NAS-IP-Address": "127.0.0.1"},
+				{"NAS-Port": 1},
+				{"Igor-OctetsAttribute": "00"},
+				{"Acct-Status-Type": "Start"},	
+				{"HW-Service-Info":"Nmyservice"}
+			]
+		},
+		"perRequestTimeoutSpec": "1s",
+		"tries": 1,
+		"serverTries": 1
+	}
+	`
+	checks := []TestCheck{
+		{"code is", "", "5"},
 	}
 	testInvoker.testCase(t, "simple test", jRadiusRequest, checks)
 }

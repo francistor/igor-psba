@@ -8,43 +8,50 @@ import (
 
 	"github.com/francistor/igor/config"
 	"github.com/francistor/igor/handlerfunctions"
-	"github.com/francistor/igor/instrumentation"
 	"github.com/francistor/igor/radiuscodec"
 )
 
-type CDRDirectory struct {
+type CDRWriter struct {
 	Path            string
-	FilenamePattern string
+	FileNamePattern string
+	Format          string
+	Attributes      string
 	CheckerName     string
+	RotateSeconds   int64
 }
 
-type AccountingCopyTarget struct {
+type CopyTarget struct {
 	// Only for logging purposes
 	TargetName string
 
 	// The name of the radius group where to send the copies
-	RadiusGroupName string
+	ProxyGroupName string
 
 	// Checker name to use to select what packets are copied
 	CheckerName string
 
 	// AVP Filter to use
 	FilterName string
+
+	// Timeout
+	ProxyTimeoutMillis int
+
+	// Tries to the proxy group
+	ProxyRetries int
+
+	// Tries for each server in proxy group
+	ProxyServerRetries int
 }
 
 type HandlerConfig struct {
 	// CDR Writing
-	// Directories where the Session CDR should be written
-	SessionCDRDirectories []CDRDirectory
-	// Directories where the Service CDR should be written
-	ServiceCDRDirectories []CDRDirectory
-	WriteSessionCDR       bool
-	WriteServiceCDR       bool
-	CdrFilenamePattern    string
+	CDRWriters         []CDRWriter
+	WriteSessionCDR    bool
+	WriteServiceCDR    bool
+	CdrFilenamePattern string
 
 	// Accounting Copy
-	SessionAccountingCopyTargets []AccountingCopyTarget
-	ServiceAccountingCopyTargets []AccountingCopyTarget
+	CopyTargets []CopyTarget
 
 	// Inline proxy
 	ProxyGroupName         string
@@ -55,6 +62,7 @@ type HandlerConfig struct {
 	// Normally overriden in a per-domain basis
 	ProxyTimeoutMillis int
 	ProxyRetries       int
+	ProxyServerRetries int
 	AuthProxyFilterOut string
 	AuthProxyFilterIn  string
 	AcctProxyFilterOut string
@@ -92,7 +100,10 @@ func (g HandlerConfig) String() string {
 }
 
 // Overrides the configuration properties with other taken from userfile config items
-func (g HandlerConfig) OverrideWith(props handlerfunctions.Properties, logLines *instrumentation.LogLines) HandlerConfig {
+func (g HandlerConfig) OverrideWith(props handlerfunctions.Properties, hl *config.HandlerLogger) HandlerConfig {
+
+	l := hl.L
+
 	for key := range props {
 		lowerKey := strings.ToLower(key)
 
@@ -101,13 +112,13 @@ func (g HandlerConfig) OverrideWith(props handlerfunctions.Properties, logLines 
 			if v, err := strconv.ParseBool(props[key]); err == nil {
 				g.WriteSessionCDR = v
 			} else {
-				logLines.WLogEntry(config.LEVEL_ERROR, "bad format for WriteSessionCDR %s %s", props[key], err)
+				l.Errorf("bad format for WriteSessionCDR %s %s", props[key], err)
 			}
 		case "writeservicecdr":
 			if v, err := strconv.ParseBool(props[key]); err == nil {
 				g.WriteServiceCDR = v
 			} else {
-				logLines.WLogEntry(config.LEVEL_ERROR, "bad format for WriteServiceCDR %s", props[key])
+				l.Errorf("bad format for WriteServiceCDR %s", props[key])
 			}
 		case "proxygroupname":
 			g.ProxyGroupName = props[key]
@@ -115,31 +126,37 @@ func (g HandlerConfig) OverrideWith(props handlerfunctions.Properties, logLines 
 			if v, err := strconv.ParseBool(props[key]); err == nil {
 				g.AcceptOnProxyError = v
 			} else {
-				logLines.WLogEntry(config.LEVEL_ERROR, "bad format for AcceptOnProxyError %s", props[key])
+				l.Errorf("bad format for AcceptOnProxyError %s", props[key])
 			}
 		case "proxysessionaccounting":
 			if v, err := strconv.ParseBool(props[key]); err == nil {
 				g.ProxySessionAccounting = v
 			} else {
-				logLines.WLogEntry(config.LEVEL_ERROR, "bad format for ProxySessionAccounting %s", props[key])
+				l.Errorf("bad format for ProxySessionAccounting %s", props[key])
 			}
 		case "proxyserviceaccounting":
 			if v, err := strconv.ParseBool(props[key]); err == nil {
 				g.ProxyServiceAccounting = v
 			} else {
-				logLines.WLogEntry(config.LEVEL_ERROR, "bad format for ProxyServiceAccounting %s", props[key])
+				l.Errorf("bad format for ProxyServiceAccounting %s", props[key])
 			}
 		case "proxytimeoutmillis":
 			if v, err := strconv.ParseInt(props[key], 10, 32); err == nil {
 				g.ProxyTimeoutMillis = int(v)
 			} else {
-				logLines.WLogEntry(config.LEVEL_ERROR, "bad format for ProxyTimeoutMillis %s", props[key])
+				l.Errorf("bad format for ProxyTimeoutMillis %s", props[key])
 			}
 		case "proxyretries":
 			if v, err := strconv.ParseInt(props[key], 10, 32); err == nil {
 				g.ProxyRetries = int(v)
 			} else {
-				logLines.WLogEntry(config.LEVEL_ERROR, "bad format for ProxyRetries %s", props[key])
+				l.Errorf("bad format for ProxyRetries %s", props[key])
+			}
+		case "proxyserverretries":
+			if v, err := strconv.ParseInt(props[key], 10, 32); err == nil {
+				g.ProxyServerRetries = int(v)
+			} else {
+				l.Errorf("bad format for ProxyServerRetries %s", props[key])
 			}
 		case "authproxyfilterout":
 			g.AuthProxyFilterOut = props[key]
@@ -155,13 +172,13 @@ func (g HandlerConfig) OverrideWith(props handlerfunctions.Properties, logLines 
 			if v, err := strconv.ParseBool(props[key]); err == nil {
 				g.UseRejectService = v
 			} else {
-				logLines.WLogEntry(config.LEVEL_ERROR, "bad format for UseRejectService %s", props[key])
+				l.Errorf("bad format for UseRejectService %s", props[key])
 			}
 		case "rejectisaddon":
 			if v, err := strconv.ParseBool(props[key]); err == nil {
 				g.RejectIsAddon = v
 			} else {
-				logLines.WLogEntry(config.LEVEL_ERROR, "bad format for RejectIsAddon %s", props[key])
+				l.Errorf("bad format for RejectIsAddon %s", props[key])
 			}
 		case "rejectservicename":
 			g.RejectServiceName = props[key]
@@ -169,13 +186,13 @@ func (g HandlerConfig) OverrideWith(props handlerfunctions.Properties, logLines 
 			if v, err := strconv.ParseBool(props[key]); err == nil {
 				g.BlockingWithService = v
 			} else {
-				logLines.WLogEntry(config.LEVEL_ERROR, "bad format for BlockingWithService %s", props[key])
+				l.Errorf("bad format for BlockingWithService %s", props[key])
 			}
 		case "blockingisaddon":
 			if v, err := strconv.ParseBool(props[key]); err == nil {
 				g.BlockingIsAddon = v
 			} else {
-				logLines.WLogEntry(config.LEVEL_ERROR, "bad format for BlockingIsAddon %s", props[key])
+				l.Errorf("bad format for BlockingIsAddon %s", props[key])
 			}
 		case "blockingservicename":
 			g.BlockingServiceName = props[key]

@@ -1,52 +1,57 @@
 {
-	"sessionCDRDirectories": [
+	"CDRWriters": [
 		{
-			"path": "/var/yaas/cdr/session",
-			"filenamePattern": "cdr_%d{yyyyMMdd}.txt"
+			"path": "/home/francisco/igor-psba/cdr/session",
+			"fileNamePattern": "cdr_2006-01-02T15-04.txt",
+			"format": "csv",
+			"attributes":"%Timestamp%,User-Name,NAS-Port,NAS-IP-Address,PSA-AccessId,PSA-AccessPort,PSA-MAC-Address",
+			"checkerName": "sessionAccounting",
+			"rotateSeconds": 60
 		},
 		{
-			"path": "/var/yaas/cdr/session-hot",
-			"filenamePattern": "cdr_copied.txt",
-			"checkerName": "filters/copyCDRWriteCheck.json"
-		}
-	],
-	"serviceCDRDirectories": [
-		{
-			"path": "/var/yaas/cdr/service",
-			"filenamePattern": "cdr_%d{yyyyMMdd}.txt"
-		}
-	],
-	"writeSessionCDR": false,
-	"writeServiceCDR": false,
-	"cdrFilenamePattern": "cdr_%d{yyyyMMdd}.txt",
-
-	"sessionAccountingCopyTargets":[
-		{
-			"targetName": "session-target-1",
-			"RadiusGroupName": "psba-superserver-group",
-			"CheckerName": "checkSessionAccounting",
-			"FilterName": "filters/passAll.json"
+			"path": "/home/francisco/igor-psba/cdr/service",
+			"fileNamePattern": "cdr_2006-01-02T15-04.txt",
+			"format": "livingstone",
+			"attributes":"User-Name,NAS-Port,NAS-IP-Address,PSA-AccessId,PSA-AccessPort,PSA-MAC-Address",
+			"checkerName": "serviceAccounting",
+			"rotateSeconds": 60
 		}
 	],
 
-	"serviceAccountingCopyTargets":[
+	"writeSessionCDR": true,
+	"writeServiceCDR": true,
+
+	"copyTargets":[
 		{
-			"targetName": "service-target-1",
-			"RadiusGroupName": "psba-superserver-group",
-			"CheckerName": "checkServiceAccounting",
-			"FilterName": "filters/passAll.json"
+			"targetName": "session-copy",
+			"proxyGroupName": "psba-superserver-group",
+			"checkerName": "sessionAccounting",
+			"filterName": "copyProxy",
+			"proxyTimeoutMillis": 500,
+			"proxyTries": 1,
+			"proxyServerTries": 1
+		},
+		{
+			"targetName": "service-copy",
+			"proxyGroupName": "psba-superserver-group",
+			"checkerName": "serviceAccounting",
+			"filterName": "copyProxy",
+			"proxyTimeoutMillis": 500,
+			"proxyRetries": 0,
+			"proxyServerRetries": 0
 		}
 	],
 
-	"proxyGroupName": "",
+	"proxyGroupName": "psba-superserver-group",
 	"acceptOnProxyError": false,
-	"proxySessionAccounting": false,
+	"proxySessionAccounting": true,
 	"proxyServiceAccounting": false,
-	"authProxyFilterOut": "filters/standardProxyFilterOut.json",
-	"authProxyFilterIn": "filters/standardProxyFilterIn.json",
-	"acctProxyFilterOut": "filters/standardProxyFilterOut.json",
+	"authProxyFilterOut": "standardProxyOut",
+	"authProxyFilterIn": "standardProxyIn",
+	"acctProxyFilterOut": "standardProxyOut",
 	"proxyTimeoutMillis": 500,
 	"proxyRetries": 1,
+	"proxyServerRetries": 1,
 
 	"provisionType": "file",
 	"authLocal": "none",

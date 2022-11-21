@@ -6,10 +6,11 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 
+	"github.com/francistor/igor/cdrwriter"
 	"github.com/francistor/igor/config"
 	"github.com/francistor/igor/handlerfunctions"
-	"github.com/francistor/igor/instrumentation"
 	"github.com/francistor/igor/radiuscodec"
 	"github.com/francistor/igor/router"
 
@@ -17,6 +18,17 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 )
+
+type RequestContext struct {
+	accessId         string
+	accessPort       int64
+	userName         string
+	realm            string
+	radiusClientType string
+	macAddress       string
+	radiusAttributes handlerfunctions.AVPItems
+	config           HandlerConfig
+}
 
 // Handler variables. Populated on initialization
 var radiusRouter *router.RadiusRouter
@@ -27,12 +39,18 @@ var dbHandle *sql.DB
 // Configuration files
 var handlerConfig HandlerConfig
 var radiusClients config.RadiusClients
+var radiusServers config.RadiusServers
 var realms handlerfunctions.RadiusUserFile
 var services handlerfunctions.RadiusUserFile
-var radiusChecks handlerfunctions.RadiusPacketChecks
+
+var radiusCheckers handlerfunctions.RadiusPacketChecks
 var radiusFilters handlerfunctions.AVPFilters
 
 var pwRegex = regexp.MustCompile(`^([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+):(([0-9]+)-)?([0-9]+)$`)
+
+// CDR Writers
+var cdrWriters []*cdrwriter.FileCDRWriter
+var cdrWriteCheckers []string
 
 // Populates database config
 func InitHandler(ci *config.PolicyConfigurationManager, r *router.RadiusRouter) error {
@@ -65,41 +83,102 @@ func InitHandler(ci *config.PolicyConfigurationManager, r *router.RadiusRouter) 
 	////////////////////////////////////////////////////////////////////////
 	// Populate the configuration files
 	////////////////////////////////////////////////////////////////////////
-	// Global configuration
-	gJson, err := ci.CM.GetConfigObjectAsText("globalConfig.json", true)
-	if err != nil {
-		return fmt.Errorf("could not read globalConfig.json %w", err)
-	}
-	err = json.Unmarshal(gJson, &handlerConfig)
-	if err != nil {
-		return fmt.Errorf("could not unmarshal globalConfig.json %w", err)
-	}
 
 	// Radius Clients
 	radiusClients = ci.RadiusClientsConf()
 
+	// Radius Servers
+	radiusServers = ci.RadiusServersConf()
+
 	// Realm config
 	realms, err = handlerfunctions.NewRadiusUserFile("realms.json", ci)
 	if err != nil {
-		return fmt.Errorf("could not get realm configuration %w", err)
+		return fmt.Errorf("could not get realm configuration: %w", err)
 	}
 
 	// Service configuration
 	services, err = handlerfunctions.NewRadiusUserFile("services.json", ci)
 	if err != nil {
-		return fmt.Errorf("could not get service configuration.json %w", err)
+		return fmt.Errorf("could not get service configuration.json: %w", err)
 	}
 
 	// Radius Checks
-	radiusChecks, err = handlerfunctions.NewRadiusPacketChecks("radiusChecks.json", ci)
+	radiusCheckers, err = handlerfunctions.NewRadiusPacketChecks("radiusCheckers.json", ci)
 	if err != nil {
-		return fmt.Errorf("could not get radius checks %w", err)
+		return fmt.Errorf("could not get radius checks: %w", err)
 	}
 
 	// Radius Filters
 	radiusFilters, err = handlerfunctions.NewAVPFilters("radiusFilters.json", ci)
 	if err != nil {
-		return fmt.Errorf("could not get radius filters %w", err)
+		return fmt.Errorf("could not get radius filters: %w", err)
+	}
+
+	// Global configuration
+	gJson, err := ci.CM.GetConfigObjectAsText("globalConfig.json", true)
+	if err != nil {
+		return fmt.Errorf("could not read globalConfig.json: %w", err)
+	}
+	err = json.Unmarshal(gJson, &handlerConfig)
+	if err != nil {
+		return fmt.Errorf("could not unmarshal globalConfig.json: %w", err)
+	}
+
+	// Sanity checks copy targets
+	for _, ct := range handlerConfig.CopyTargets {
+		if _, found := radiusCheckers[ct.CheckerName]; !found {
+			panic(fmt.Sprintf("checker %s not found", ct.CheckerName))
+		}
+		if _, found := radiusFilters[ct.FilterName]; !found {
+			panic(fmt.Sprintf("checker %s not found", ct.FilterName))
+		}
+		if _, found := radiusServers.ServerGroups[ct.ProxyGroupName]; !found {
+			panic(fmt.Sprintf("proxy group %s not found", ct.ProxyGroupName))
+		}
+	}
+
+	// Sanity checks for global config
+	if _, found := radiusFilters[handlerConfig.AuthProxyFilterIn]; !found {
+		panic(fmt.Sprintf("filter %s not found", handlerConfig.AuthProxyFilterIn))
+	}
+	if _, found := radiusFilters[handlerConfig.AuthProxyFilterOut]; !found {
+		panic(fmt.Sprintf("filter %s not found", handlerConfig.AuthProxyFilterOut))
+	}
+	if _, found := radiusFilters[handlerConfig.AcctProxyFilterOut]; !found {
+		panic(fmt.Sprintf("filter %s not found", handlerConfig.AcctProxyFilterOut))
+	}
+	if handlerConfig.ProxyGroupName != "" {
+		if _, found := radiusServers.ServerGroups[handlerConfig.ProxyGroupName]; !found {
+			panic(fmt.Sprintf("proxy group %s not found", handlerConfig.ProxyGroupName))
+		}
+	}
+
+	////////////////////////////////////////////////////////////////////////
+	// Create CDR writers
+	////////////////////////////////////////////////////////////////////////
+	for _, w := range handlerConfig.CDRWriters {
+		var cdrf cdrwriter.CDRFormatter
+		var attrs []string
+		if w.Attributes != "" {
+			attrs = strings.Split(w.Attributes, ",")
+		}
+
+		if strings.EqualFold("csv", w.Format) {
+			cdrf = cdrwriter.NewCSVWriter(attrs, ";", ",", "2006-01-02T15:04:05 MST", true, true)
+		} else if strings.EqualFold("livingstone", w.Format) {
+			cdrf = cdrwriter.NewLivingstoneWriter(attrs, nil, "2006-01-02T15:04:05 MST", "2006-01-02T15:04:05 MST")
+		} else if strings.EqualFold("json", w.Format) {
+			cdrf = cdrwriter.NewJSONWriter(attrs, nil)
+		} else {
+			panic("unrecognized format for CDR: " + w.Format)
+		}
+		cdrWriters = append(cdrWriters, cdrwriter.NewFileCDRWriter(w.Path, w.FileNamePattern, cdrf, w.RotateSeconds))
+		cdrWriteCheckers = append(cdrWriteCheckers, w.CheckerName)
+
+		// Sanity check for checker name
+		if _, found := radiusCheckers[w.CheckerName]; !found {
+			panic(fmt.Sprintf("checker %s not found", w.CheckerName))
+		}
 	}
 
 	return nil
@@ -114,18 +193,19 @@ func CloseHandler() {
 // Main entry point
 func RequestHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
 
-	// Prepare logging infra
-	logLines := make(instrumentation.LogLines, 0)
+	hl := config.NewHandlerLogger()
+	l := hl.L
+	l.Debug("")
 
-	defer func(lines []instrumentation.LogLine) {
-		logLines.WriteWLog()
-	}(logLines)
+	defer func(h *config.HandlerLogger) {
+		h.L.Debug("---[END REQUEST]-----")
+		h.L.Debug("")
+		h.WriteLog()
+	}(hl)
 
+	l.Debug("---[START REQUEST]-----")
 	if config.IsDebugEnabled() {
-		logLines.WLogEntry(config.LEVEL_DEBUG, "")
-		logLines.WLogEntry(config.LEVEL_DEBUG, ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
-		logLines.WLogEntry(config.LEVEL_DEBUG, "starting processing radius packet")
-		logLines.WLogEntry(config.LEVEL_DEBUG, request.String())
+		l.Debug(request.String())
 	}
 
 	// Detect client type based on the attributes received
@@ -141,7 +221,7 @@ func RequestHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacke
 	} else {
 		radiusClientType = "DEFAULT"
 	}
-	logLines.WLogEntry(config.LEVEL_DEBUG, "radius client type: %s", radiusClientType)
+	l.Debugf("radius client type: %s", radiusClientType)
 
 	// Normalize request data
 	var userName = strings.ToLower(request.GetStringAVP("User-Name"))
@@ -150,10 +230,10 @@ func RequestHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacke
 	if len(userNameComponents) > 1 {
 		realm = userNameComponents[1]
 	}
-	logLines.WLogEntry(config.LEVEL_DEBUG, "realm: %s", realm)
+	l.Debugf("realm: %s", realm)
 
 	var macAddress = ""
-	if addr := request.GetStringAVP("Huawei-User-MAC"); addr != "" {
+	if addr := request.GetStringAVP("Hw-User-MAC"); addr != "" {
 		macAddress = addr
 	} else if addr := request.GetStringAVP("Alc-Client-Hardware-Addr"); addr != "" {
 		macAddress = addr
@@ -178,45 +258,45 @@ func RequestHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacke
 		dslamIPAddr := m[1]
 		svlan := m[2]
 		cvlan := m[3]
-		logLines.WLogEntry(config.LEVEL_DEBUG, "Decoded NAS-Port-Id %s:%s-%s", dslamIPAddr, svlan, cvlan)
+		l.Debugf("Decoded NAS-Port-Id %s:%s-%s", dslamIPAddr, svlan, cvlan)
 
 		svlanInt, err := strconv.ParseInt(svlan, 10, 64)
 		if err != nil {
-			logLines.WLogEntry(config.LEVEL_ERROR, "Bad svlan: %s", svlan)
+			l.Errorf("Bad svlan: %s", svlan)
 		}
 		cvlanInt, err := strconv.ParseInt(cvlan, 10, 64)
 		if err != nil {
-			logLines.WLogEntry(config.LEVEL_ERROR, "Bad cvlan: %s", cvlan)
+			l.Errorf("Bad cvlan: %s", cvlan)
 		}
 		accessPort = svlanInt*4096 + cvlanInt
 		accessId = dslamIPAddr
-		logLines.WLogEntry(config.LEVEL_DEBUG, "access line with pseudowire format. port %d - accessId %s", accessPort, accessId)
+		l.Debugf("access line with pseudowire format. port %d - accessId %s", accessPort, accessId)
 	}
 
 	// If the above did not produce a result
 	if accessId == "" {
 		accessPort = request.GetIntAVP("NAS-Port")
 		accessId = request.GetStringAVP("NAS-IP-Address")
-		logLines.WLogEntry(config.LEVEL_DEBUG, "access line with nasport/nasip format. port %d - accessId %s", accessPort, accessId)
+		l.Debugf("access line with nasport/nasip format. port %d - accessId %s", accessPort, accessId)
 	}
 
-	// Push attribute with real NAS-IP-Address, if availble
-	var nasipAddr string
-	if v, err := request.GetAVP("NAS-IP-Address"); err == nil {
-		request.AddAVP(&v)
-		nasipAddr = v.GetString()
-	}
+	// To look for client configuration
+	var nasipAddr = request.GetStringAVP("NAS-IP-Address")
+
+	// Push attributes with cooked access identifiers
+	request.Add("PSA-AccessId", accessId)
+	request.Add("PSA-AccessPort", int(accessPort))
 
 	// Merge the configuration. Priority is realm > client > global
 	var clientConfig handlerfunctions.Properties = radiusClients[nasipAddr].ClientProperties
 	var realmConfig handlerfunctions.Properties = realms[realm].ConfigItems
-	requestConfig := handlerConfig.OverrideWith(clientConfig.OverrideWith(realmConfig), &logLines)
+	requestConfig := handlerConfig.OverrideWith(clientConfig.OverrideWith(realmConfig), hl)
 
 	if config.IsDebugEnabled() {
-		logLines.WLogEntry(config.LEVEL_DEBUG, "global config: %s", handlerConfig)
-		logLines.WLogEntry(config.LEVEL_DEBUG, "realm config: %s", realmConfig)
-		logLines.WLogEntry(config.LEVEL_DEBUG, "client config: %s", clientConfig)
-		logLines.WLogEntry(config.LEVEL_DEBUG, "merged config: %s", requestConfig)
+		l.Debugf("global config: %s", handlerConfig)
+		l.Debugf("realm config: %s", realmConfig)
+		l.Debugf("client config: %s", clientConfig)
+		l.Debugf("merged config: %s", requestConfig)
 	}
 
 	// Merge the reply attributes. Priority is realm > global
@@ -228,20 +308,36 @@ func RequestHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacke
 	noRadiusAttributes = realms[realm].NonOverridableReplyItems.Add(handlerConfig.NonOverridableRadiusAttrs)
 
 	if config.IsDebugEnabled() {
-		logLines.WLogEntry(config.LEVEL_DEBUG, "handler attributes: %s", handlerConfig.RadiusAttrs)
-		logLines.WLogEntry(config.LEVEL_DEBUG, "realm attributes: %s", realms[realm].ReplyItems)
-		logLines.WLogEntry(config.LEVEL_DEBUG, "merged attributes: %s", radiusAttributes)
-		logLines.WLogEntry(config.LEVEL_DEBUG, "no-handler attributes: %s", handlerConfig.NonOverridableRadiusAttrs)
-		logLines.WLogEntry(config.LEVEL_DEBUG, "no-realm attributes: %s", realms[realm].NonOverridableReplyItems)
-		logLines.WLogEntry(config.LEVEL_DEBUG, "no-merged attributes: %s", noRadiusAttributes)
+		l.Debugf("handler attributes: %s", handlerConfig.RadiusAttrs)
+		l.Debugf("realm attributes: %s", realms[realm].ReplyItems)
+		l.Debugf("merged attributes: %s", radiusAttributes)
+		l.Debugf("no-handler attributes: %s", handlerConfig.NonOverridableRadiusAttrs)
+		l.Debugf("no-realm attributes: %s", realms[realm].NonOverridableReplyItems)
+		l.Debugf("no-merged attributes: %s", noRadiusAttributes)
+	}
+
+	// Build Request context
+	ctx := RequestContext{
+		accessId:         accessId,
+		accessPort:       accessPort,
+		userName:         userName,
+		realm:            realm,
+		radiusClientType: radiusClientType,
+		macAddress:       macAddress,
+		radiusAttributes: radiusAttributes,
+		config:           requestConfig,
 	}
 
 	// Call the corresponding handler
 	switch request.Code {
 	case radiuscodec.ACCESS_REQUEST:
-		return AccessRequestHandler(request, logLines)
+		return AccessRequestHandler(request, &ctx, hl)
 	case radiuscodec.ACCOUNTING_REQUEST:
-		return AccountingRequestHandler(request, logLines)
+		// To avoid issues when sending packets in copy mode
+		var wg sync.WaitGroup
+		resp, err := AccountingRequestHandler(request, &ctx, hl, &wg)
+		wg.Wait()
+		return resp, err
 	}
 
 	// If here, the packet was not recognized

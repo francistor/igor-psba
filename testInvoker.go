@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -34,20 +35,22 @@ func (i *TestInvoker) testCase(t *testing.T, testName string, request string, ch
 		t.Fatalf("%s could not unmarshal response due to %s", testName, err)
 	}
 
+	var val string
 	for _, check := range checks {
 		switch check.checkType {
 		case "avp is":
-			val := radiusResponse.GetStringAVP(check.checkOperand)
+			val = radiusResponse.GetStringAVP(check.checkOperand)
 			if val != check.checkValue {
-				t.Errorf("[FAIL] <%s> %s is %s", testName, check.checkOperand, check.checkValue)
+				t.Errorf("[FAIL] <%s> %s is %s", testName, check.checkOperand, val)
 			} else {
 				t.Logf("[OK] <%s> %s is %s", testName, check.checkOperand, check.checkValue)
 			}
 		case "code is":
-			if string(radiusResponse.Code) != check.checkValue {
-				t.Errorf("[FAIL] <%s> code is %s", testName, check.checkValue)
+			val = fmt.Sprintf("%d", radiusResponse.Code)
+			if val != check.checkValue {
+				t.Errorf("[FAIL] <%s> response code is %s", testName, val)
 			} else {
-				t.Errorf("[OK] <%s> code is %s", testName, check.checkValue)
+				t.Logf("[OK] <%s> response code is %s", testName, check.checkValue)
 			}
 		}
 	}

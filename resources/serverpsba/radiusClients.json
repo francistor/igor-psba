@@ -2,6 +2,7 @@
 	{
 		"name": "psba-client",
 		"IPAddress": "127.0.0.1",
-		"secret": "secret"
+		"secret": "secret",
+		"clientClass": "BNG"
 	}
 ]
