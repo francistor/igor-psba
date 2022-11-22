@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/francistor/igor/cdrwriter"
 	"github.com/francistor/igor/config"
@@ -52,6 +53,9 @@ var pwRegex = regexp.MustCompile(`^([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+):(([0-9]+)-)?
 var cdrWriters []*cdrwriter.FileCDRWriter
 var cdrWriteCheckers []string
 
+// PlanParameter cache
+var planCache *PlanCache
+
 // Populates database config
 func InitHandler(ci *config.PolicyConfigurationManager, r *router.RadiusRouter) error {
 
@@ -79,6 +83,12 @@ func InitHandler(ci *config.PolicyConfigurationManager, r *router.RadiusRouter) 
 		// Just log. The database may be available later
 		config.GetLogger().Warnf("could not ping database %s %s", databaseConfig.Driver, databaseConfig.Url)
 	}
+
+	////////////////////////////////////////////////////////////////////////
+	// Start the cache
+	////////////////////////////////////////////////////////////////////////
+	planCache = NewPlanCache(dbHandle, 1*time.Second)
+	planCache.Start()
 
 	////////////////////////////////////////////////////////////////////////
 	// Populate the configuration files
@@ -187,6 +197,9 @@ func InitHandler(ci *config.PolicyConfigurationManager, r *router.RadiusRouter) 
 func CloseHandler() {
 	if dbHandle != nil {
 		dbHandle.Close()
+	}
+	if planCache != nil {
+		planCache.Close()
 	}
 }
 

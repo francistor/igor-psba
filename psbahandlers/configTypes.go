@@ -73,15 +73,16 @@ type HandlerConfig struct {
 	AuthLocal string
 
 	// Whether to send Access-Reject to users not provisioned or with bad credentials
-	UseRejectService  bool
-	RejectServiceName string
+	RejectProfile string
 	// The reject service may replace the basic service or be configured as an addon service
 	RejectIsAddon bool
 
+	// Users not found in database
+	PermissiveProfile string
+
 	// Whether to send Access-Reject to blocked user
-	BlockingWithService bool
-	BlockingServiceName string
-	BlockingIsAddon     bool
+	BlockingProfile string
+	BlockingIsAddon bool
 
 	// Global Radius attributes to send
 	RadiusAttrs               []radiuscodec.RadiusAVP
@@ -168,34 +169,24 @@ func (g HandlerConfig) OverrideWith(props handlerfunctions.Properties, hl *confi
 			g.ProvisionType = props[key]
 		case "authlocal":
 			g.AuthLocal = props[key]
-		case "userejectservice":
-			if v, err := strconv.ParseBool(props[key]); err == nil {
-				g.UseRejectService = v
-			} else {
-				l.Errorf("bad format for UseRejectService %s", props[key])
-			}
 		case "rejectisaddon":
 			if v, err := strconv.ParseBool(props[key]); err == nil {
 				g.RejectIsAddon = v
 			} else {
 				l.Errorf("bad format for RejectIsAddon %s", props[key])
 			}
-		case "rejectservicename":
-			g.RejectServiceName = props[key]
-		case "blockingwithservice":
-			if v, err := strconv.ParseBool(props[key]); err == nil {
-				g.BlockingWithService = v
-			} else {
-				l.Errorf("bad format for BlockingWithService %s", props[key])
-			}
+		case "rejectprofile":
+			g.RejectProfile = props[key]
+		case "permissiveservicename":
+			g.PermissiveProfile = props[key]
 		case "blockingisaddon":
 			if v, err := strconv.ParseBool(props[key]); err == nil {
 				g.BlockingIsAddon = v
 			} else {
 				l.Errorf("bad format for BlockingIsAddon %s", props[key])
 			}
-		case "blockingservicename":
-			g.BlockingServiceName = props[key]
+		case "blockingprofile":
+			g.BlockingProfile = props[key]
 		}
 	}
 

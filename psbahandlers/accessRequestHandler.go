@@ -9,7 +9,11 @@ import (
 
 func AccessRequestHandler(request *radiuscodec.RadiusPacket, ctx *RequestContext, hl *config.HandlerLogger) (*radiuscodec.RadiusPacket, error) {
 
+	// For logging
 	l := hl.L
+
+	// We signal that the client is to be rejected by providing a value to this variable, that is used also in the Reply-Message
+	var rejectReason string
 
 	// Find the user
 	clientpou, err := findClient(ctx.userName, ctx.accessPort, ctx.accessId, hl)
@@ -23,7 +27,19 @@ func AccessRequestHandler(request *radiuscodec.RadiusPacket, ctx *RequestContext
 		l.Debug(clientpou.NotificationExpDate.Format("2006-01-02T15:04:05 MST"))
 	} else {
 		l.Debug("client not found\n")
+		// If permissiveProfile is defined, we assign that one. Otherwise, signal rejection
+		if ctx.config.PermissiveProfile != "" {
+			l.Debugf("assigning permissive profile <%s>", ctx.config.PermissiveProfile)
+			clientpou.AccessId = ctx.accessId
+			clientpou.AccessPort = ctx.accessPort
+			clientpou.UserName = ctx.userName
+			clientpou.PlanName = ctx.config.PermissiveProfile
+		} else {
+			rejectReason = "not found"
+		}
 	}
+
+	println(rejectReason)
 
 	response := radiuscodec.NewRadiusResponse(request, true)
 
@@ -46,6 +62,7 @@ type NullableClientPoU struct {
 	AddonProfileOverride        sql.NullString
 	AddonProfileOverrideExpDate sql.NullTime
 	NotificationExpDate         sql.NullTime
+	Parameters                  sql.NullString
 	AccessPort                  sql.NullInt64
 	AccessId                    sql.NullString
 	UserName                    sql.NullString
@@ -69,6 +86,7 @@ func (p *NullableClientPoU) toPoU() ClientPoU {
 		AddonProfileOverride:        p.AddonProfileOverride.String,
 		AddonProfileOverrideExpDate: p.AddonProfileOverrideExpDate.Time,
 		NotificationExpDate:         p.NotificationExpDate.Time,
+		Parameters:                  p.Parameters.String,
 		AccessPort:                  p.AccessPort.Int64,
 		AccessId:                    p.AccessId.String,
 		UserName:                    p.UserName.String,
@@ -101,6 +119,7 @@ func findClient(userName string, accessPort int64, accessId string, hl *config.H
 	AddonProfileOverride, 
 	AddonProfileOverrideExpDate, 
 	NotificationExpDate,
+	Parameters,
 	AccessPort,
 	AccessId,
 	UserName,
@@ -132,6 +151,7 @@ func findClient(userName string, accessPort int64, accessId string, hl *config.H
 			&clientpou.AddonProfileOverride,
 			&clientpou.AddonProfileOverrideExpDate,
 			&clientpou.NotificationExpDate,
+			&clientpou.Parameters,
 			&clientpou.AccessPort,
 			&clientpou.AccessId,
 			&clientpou.UserName,

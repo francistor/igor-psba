@@ -56,12 +56,12 @@
 	"provisionType": "file",
 	"authLocal": "none",
 
-	"useRejectService": false,
-	"rejectServiceName": "void",
+	"rejectProfile": "void",
 	"rejectIsAddon": false,
 
-	"blockingWithService": false,
-	"blockingServiceName": "void",
+	"permissiveProfile": "",
+
+	"blockingProfile": "void",
 	"blockingIsAddon": false,
 
 	"radiusAttrs":[
