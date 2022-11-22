@@ -13,5 +13,8 @@ igor-psba
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
+# CDR directory
+cdr/*
+
 # Dependency directories (remove the comment below to include it)
 # vendor/
