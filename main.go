@@ -11,7 +11,7 @@ import (
 	"github.com/francistor/igor/handlerfunctions"
 	"github.com/francistor/igor/router"
 
-	psbahandler "github.com/francistor/igor-psba/psbahandlers"
+	"github.com/francistor/igor-psba/psbahandlers"
 )
 
 func main() {
@@ -44,10 +44,10 @@ func main() {
 	logger.Info("Radius router started")
 
 	// Initialize handler. Reads configuration files
-	if err := psbahandler.InitHandler(ci, r); err != nil {
+	if err := psbahandlers.InitHandler(ci, r); err != nil {
 		panic("could not initialize handler " + err.Error())
 	}
-	defer psbahandler.CloseHandler()
+	defer psbahandlers.CloseHandler()
 
 	// Start server
 	r.Start()

@@ -1,16 +1,16 @@
 {
-	"provisiontype.authtype.reject_addon.block_addon.proxy":{
+	"provisiontype.authtype.permissive.reject_addon.block_addon.proxy":{
 		"configItems":{
 			"provisionType": "database",
 			"authLocal": "provision",
 
-			"useRejectService": "true",
 			"rejectIsAddon": "true",
-			"rejectServiceName": "preject",
+			"rejectProfile": "preject",
 
-			"blockingWithService": "true",
-			"blockingServiceName": "pcautiv",
+			"blockingProfile": "pcautiv",
 			"blockingIsAddon": "true",
+
+			"permissiveProfile": "",
 
 			"writeServiceCDR": "yes",
 			"writeSessionCDR": "yes",
@@ -19,29 +19,30 @@
 		}
 	},
 
-	"database.provision.preject_addon.pcautiv_addon.proxy":{
+	"database.provision.nopermissive.reject_addon.pcautiv_addon.proxy":{
 		"configItems": {
 			"provisionType": "database",
 			"authLocal": "provision",
 
-			"useRejectService": "true",
-			"rejectIdAddon": "true",
-			"rejectServiceName": "preject",
+			"permissiveProfile": "",
 
-			"blockingWithService": "true",
-			"blockingServiceName": "pcautiv",
+			"rejectServiceName": "reject",
+			"rejectIdAddon": "true",
+
+			"blockingProfile": "pcautiv",
 			"blockingIsAddon": "true",
 
 			"writeServiceCDR": "true",
 			"writeSessionCDR": "true",
 
-			"authProxyFilterOut": "filters/altAuthFilterOut.json"
+			"proxyGroupName": "psba-superserver-group",
+			"authProxyFilterOut": "altProxyOut"
 		},
 		"replyItems": [
 			{"Unisphere-Virtual-Router": "vrouter-1"}
 		],
 		"nonOverridableReplyItems": [
-			{"Cisco-AVPair": "realm=database.provision.preject_addon.pcautiv_addon.proxy"}
+			{"Cisco-AVPair": "database.provision.nopermissive.reject_addon.pcautiv_addon.proxy"}
 		]
 	}
 

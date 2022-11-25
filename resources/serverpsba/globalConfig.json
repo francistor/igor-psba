@@ -42,7 +42,7 @@
 		}
 	],
 
-	"proxyGroupName": "psba-superserver-group",
+	"proxyGroupName": "",
 	"acceptOnProxyError": false,
 	"proxySessionAccounting": true,
 	"proxyServiceAccounting": false,
@@ -56,13 +56,18 @@
 	"provisionType": "file",
 	"authLocal": "none",
 
-	"rejectProfile": "void",
-	"rejectIsAddon": false,
-
 	"permissiveProfile": "",
 
-	"blockingProfile": "void",
+	"rejectProfile": "",
+	"rejectIsAddon": false,
+
+	"blockingProfile": "pcautiv",
 	"blockingIsAddon": false,
+	"blockingSessionTimeoutSeconds": 3600,
+
+	"realmProfile": "",
+
+	"notificationIsAddon": true,
 
 	"radiusAttrs":[
 		{"Session-Timeout": 3600}

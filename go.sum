@@ -2,8 +2,10 @@ github.com/benbjohnson/clock v1.1.0 h1:Q92kusRqC1XV2MjkWETPvjJVqKetz1OzxZB7mHJLj
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/francistor/igor v0.0.0-20221121134643-799fb698f1ab h1:4+ji4SBnnMoGbn7uflsQ2TAO2nFf7sd7YdikCpke5kk=
-github.com/francistor/igor v0.0.0-20221121134643-799fb698f1ab/go.mod h1:DegFFXqp92aFgK4ku0D3mUYIISJqySkKmAFRBi8mhIQ=
+github.com/francistor/igor v0.0.0-20221122212641-2733f6545e20 h1:dxNNoQss8umebJEuRUnamh0EKyoYoWajtsq71gT+jTs=
+github.com/francistor/igor v0.0.0-20221122212641-2733f6545e20/go.mod h1:DegFFXqp92aFgK4ku0D3mUYIISJqySkKmAFRBi8mhIQ=
+github.com/francistor/igor v0.0.0-20221125181253-fa92263f4c4f h1:ldGtZy9jacp0Q2X2PWL6p7l7flfSHHK8G1PFiVcv9S4=
+github.com/francistor/igor v0.0.0-20221125181253-fa92263f4c4f/go.mod h1:DegFFXqp92aFgK4ku0D3mUYIISJqySkKmAFRBi8mhIQ=
 github.com/go-sql-driver/mysql v1.6.0 h1:BCTh4TKNUYmOmMUcQ3IipzF5prigylS7XXjEkfCHuOE=
 github.com/go-sql-driver/mysql v1.6.0/go.mod h1:DCzpHaOWr8IXmIStZouvnhqoel9Qv2LBy8hT2VhHyBg=
 github.com/pkg/errors v0.8.1 h1:iURUrRGxPUNPdy5/HRSm+Yj6okJ6UtLINN0Q9M4+h3I=

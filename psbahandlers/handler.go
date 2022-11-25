@@ -42,7 +42,8 @@ var handlerConfig HandlerConfig
 var radiusClients config.RadiusClients
 var radiusServers config.RadiusServers
 var realms handlerfunctions.RadiusUserFile
-var services handlerfunctions.RadiusUserFile
+var profiles handlerfunctions.RadiusUserFile
+var specialUsers handlerfunctions.RadiusUserFile
 
 var radiusCheckers handlerfunctions.RadiusPacketChecks
 var radiusFilters handlerfunctions.AVPFilters
@@ -80,8 +81,9 @@ func InitHandler(ci *config.PolicyConfigurationManager, r *router.RadiusRouter) 
 	}
 	err = dbHandle.Ping()
 	if err != nil {
-		// Just log. The database may be available later
-		config.GetLogger().Warnf("could not ping database %s %s", databaseConfig.Driver, databaseConfig.Url)
+		// If the database is not available, die
+		config.GetLogger().Errorf("could not ping database %s %s", databaseConfig.Driver, databaseConfig.Url)
+		panic("could not ping database")
 	}
 
 	////////////////////////////////////////////////////////////////////////
@@ -100,6 +102,12 @@ func InitHandler(ci *config.PolicyConfigurationManager, r *router.RadiusRouter) 
 	// Radius Servers
 	radiusServers = ci.RadiusServersConf()
 
+	// special users
+	specialUsers, err = handlerfunctions.NewRadiusUserFile("specialUsers.json", ci)
+	if err != nil {
+		return fmt.Errorf("could not get special users configuration: %w", err)
+	}
+
 	// Realm config
 	realms, err = handlerfunctions.NewRadiusUserFile("realms.json", ci)
 	if err != nil {
@@ -107,9 +115,9 @@ func InitHandler(ci *config.PolicyConfigurationManager, r *router.RadiusRouter) 
 	}
 
 	// Service configuration
-	services, err = handlerfunctions.NewRadiusUserFile("services.json", ci)
+	profiles, err = handlerfunctions.NewRadiusUserFile("profiles.json", ci)
 	if err != nil {
-		return fmt.Errorf("could not get service configuration.json: %w", err)
+		return fmt.Errorf("could not get profiles configuration.json: %w", err)
 	}
 
 	// Radius Checks

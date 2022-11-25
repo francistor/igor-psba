@@ -13,5 +13,11 @@
         "force": [
           ["Service-Type", "Framed"]
         ]
-    }
+    },
+    "altProxyOut":{
+      "remove": ["NAS-Port-Id", "NAS-Identifier", "NAS-IP-Address", "NAS-Port"],
+      "force": [
+        ["Service-Type", "Login"]
+      ]
+  }
 }

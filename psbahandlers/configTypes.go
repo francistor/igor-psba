@@ -81,8 +81,15 @@ type HandlerConfig struct {
 	PermissiveProfile string
 
 	// Whether to send Access-Reject to blocked user
-	BlockingProfile string
-	BlockingIsAddon bool
+	BlockingProfile               string
+	BlockingIsAddon               bool
+	BlockingSessionTimeoutSeconds int
+
+	// To be used in the domain configuration, to override the basic profile
+	RealmProfile string
+
+	// Advertising service could be basic
+	NotificationIsAddon bool
 
 	// Global Radius attributes to send
 	RadiusAttrs               []radiuscodec.RadiusAVP
@@ -187,6 +194,20 @@ func (g HandlerConfig) OverrideWith(props handlerfunctions.Properties, hl *confi
 			}
 		case "blockingprofile":
 			g.BlockingProfile = props[key]
+		case "blockingsessiontimeoutseconds":
+			if v, err := strconv.ParseInt(props[key], 10, 32); err == nil {
+				g.BlockingSessionTimeoutSeconds = int(v)
+			} else {
+				l.Errorf("bad format for BlockingSessionTimeoutSeconds %s", props[key])
+			}
+		case "realmprofile":
+			g.RealmProfile = props[key]
+		case "notificationisaddon":
+			if v, err := strconv.ParseBool(props[key]); err == nil {
+				g.NotificationIsAddon = v
+			} else {
+				l.Errorf("bad format for NotificationIsAddon %s", props[key])
+			}
 		}
 	}
 

@@ -2,8 +2,9 @@ package psbahandlers
 
 import (
 	"database/sql"
-	"fmt"
 	"time"
+
+	"github.com/francistor/igor/config"
 )
 
 // Represents a PlanParameter
@@ -27,7 +28,9 @@ func NewPlanCache(dbHandle *sql.DB, tickTime time.Duration) *PlanCache {
 	}
 
 	// Initialize
-	pc.refreshParameters()
+	if err := pc.refreshParameters(); err != nil {
+		config.GetLogger().Errorf("plan parameters cache refresh error: %s", err)
+	}
 
 	return &pc
 }
@@ -38,7 +41,7 @@ func (pc *PlanCache) Start() {
 		for range pc.ticker.C {
 			err := pc.refreshParameters()
 			if err != nil {
-				fmt.Println("plan parameters cache refresh error: " + err.Error())
+				config.GetLogger().Errorf("plan parameters cache refresh error: %s", err)
 			}
 		}
 	}()

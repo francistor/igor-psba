@@ -1,0 +1,102 @@
+{
+	"basic":{
+		"radiusAttrs":[
+			{"Unisphere-Service-Bundle": "Aservice_0"}
+		],
+		"nonOverridableRadiusAttrs":[
+			{"HW-Account-Info": "Aservice_0"}
+		],
+		"oobRadiusAttrs": [
+			{"HW-AVPair": "service:accounting-scheme:telefonica"},
+			{"HW-AVPair": "service:radius-server-group:psa"},
+			{"HW-Input-Committed-Information-Rate": "3000000"},
+			{"HW-Output-Committed-Information-Rate": "1000000"}
+		]
+	},
+
+	"permissive":{
+		"radiusAttrs":[
+			{"Unisphere-Service-Bundle": "Apermissive"},
+			{"Session-Timeout": 2400}
+		],
+		"nonOverridableRadiusAttrs":[
+			{"HW-Account-Info": "Apermissive"}
+		]
+	},
+
+	"pcautiv":{
+		"radiusAttrs":[
+			{"Unisphere-Service-Bundle": "Apcautiv"}
+		],
+		"nonOverridableRadiusAttrs":[
+			{"HW-Account-Info": "Apcautiv"}
+		]
+	},
+
+	"reject":{
+		"radiusAttrs":[
+			{"Unisphere-Service-Bundle": "Apreject"}
+		],
+		"nonOverridableRadiusAttrs":[
+			{"HW-Account-Info": "Areject"}
+		]
+	},
+
+	"addon_1":{
+		"radiusAttrs":[
+			{"Session-Timeout": "300"}
+		],
+		"nonOverridableRadiusAttrs":[
+			{"HW-Account-Info": "Aaddon_1"}
+		]
+	},
+
+	"vala":{
+		"radiusAttrs":[
+			{"Unisphere-Service-Bundle": "Avala"}
+		],
+		"nonOverridableRadiusAttrs":[
+			{"HW-Account-Info": "Avala"}
+		]
+	},
+
+	"addon_vala":{
+		"radiusAttrs":[
+			{"Session-Timeout": "900"}
+		],
+		"nonOverridableRadiusAttrs":[
+			{"HW-Account-Info": "Aaddon_vala"}
+		]
+	},
+
+	"rejectOnline":{
+		"nonOverridableRadiusAttrs":[
+			{"HW-Account-Info": "ArejectOnline"}
+		]
+	},
+
+	"pcautivOnline":{
+		"nonOverridableRadiusAttrs":[
+			{"HW-Account-Info": "ApcautivOnline"}
+		]
+	},
+	
+	"acs":{
+		"radiusAttrs":[
+			{"Unisphere-Service-Bundle": "Aacs"}
+		],
+		"nonOverridableRadiusAttrs":[
+			{"HW-Account-Info": "Aacs"}
+		]
+	},
+	
+	"betatester":{
+		"radiusAttrs":[
+			{"Unisphere-Service-Bundle": "Abetatester"}
+		],
+		"nonOverridableRadiusAttrs":[
+			{"HW-Account-Info": "Abetatester"}
+		]
+	}
+	
+}
