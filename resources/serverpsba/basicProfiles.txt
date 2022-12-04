@@ -1,0 +1,17 @@
+{
+	"basic":{
+		"replyItems":[
+			{"Unisphere-Service-Bundle": "Aservice_0"},
+			{"Reply-Message": "{{.Message}}"}
+		],
+		"nonOverridableReplyItems":[
+			{"HW-Account-Info": "Aservice_0"}
+		],
+		"oobReplyItems": [
+			{"HW-AVPair": "service:accounting-scheme:telefonica"},
+			{"HW-AVPair": "service:radius-server-group:psa"},
+			{"HW-Input-Committed-Information-Rate": {{.Speed}} },
+			{"HW-Output-Committed-Information-Rate": {{.Speed}} }
+		]
+	}
+}

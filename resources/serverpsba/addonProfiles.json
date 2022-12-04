@@ -1,19 +1,4 @@
 {
-	"basic":{
-		"radiusAttrs":[
-			{"Unisphere-Service-Bundle": "Aservice_0"}
-		],
-		"nonOverridableRadiusAttrs":[
-			{"HW-Account-Info": "Aservice_0"}
-		],
-		"oobRadiusAttrs": [
-			{"HW-AVPair": "service:accounting-scheme:telefonica"},
-			{"HW-AVPair": "service:radius-server-group:psa"},
-			{"HW-Input-Committed-Information-Rate": "3000000"},
-			{"HW-Output-Committed-Information-Rate": "1000000"}
-		]
-	},
-
 	"permissive":{
 		"radiusAttrs":[
 			{"Unisphere-Service-Bundle": "Apermissive"},

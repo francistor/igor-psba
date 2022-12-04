@@ -1,21 +1,29 @@
 {
 	"user_0@file.provision.p0.r0.bb": {
-		"password": "password!_0",
-		"legacyClientId": "legacy_0",
-		"phone": "phone_0",
-		"basicServiceName": "service_0",
-		"status": 0
+		"checkItems":{
+			"password": "password!_0",
+			"legacyClientId": "legacy_0",
+			"phone": "phone_0",
+			"basicServiceName": "service_0",
+			"status": "0"
+		}
 	},
 
 	"reject@file":{
-		"password": "mypassword"
+		"checkItems": {
+			"password": "mypassword"
+		}
 	},
 	
 	"drop@file":{
-		"password": "mypassword"
+		"checkItems": {
+			"password": "mypassword"
+		}
 	},
 	
 	"betatester@betatester": {
-		"password": "mypassword"
+		"checkItems":{
+			"password": "mypassword"
+		}
 	}
 }

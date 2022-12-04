@@ -49,7 +49,8 @@ var dbHandle *sql.DB
 var handlerConfig *config.ConfigObject[HandlerConfig]
 var realms *config.ConfigObject[handler.RadiusUserFile]
 var specialUsers *config.ConfigObject[handler.RadiusUserFile]
-var profiles *config.TemplatedConfigObject[handler.RadiusUserFile, PlanTemplateParams]
+var addonProfiles *config.ConfigObject[handler.RadiusUserFile]
+var basicProfiles *config.TemplatedConfigObject[handler.RadiusUserFile, PlanTemplateParams]
 
 var radiusCheckers handler.RadiusPacketChecks
 var radiusFilters handler.AVPFilters
@@ -118,10 +119,17 @@ func InitHandler(ci *config.PolicyConfigurationManager, r *router.RadiusRouter) 
 	}
 
 	// Service configuration
-	profiles = config.NewTemplatedConfigObject[handler.RadiusUserFile, PlanTemplateParams]("profiles.json", "planparameters")
-	if err = profiles.Update(&ci.CM); err != nil {
-		return fmt.Errorf("could not get profiles configuration.json: %w", err)
+	basicProfiles = config.NewTemplatedConfigObject[handler.RadiusUserFile, PlanTemplateParams]("basicProfiles.txt", "planparameters")
+	if err = basicProfiles.Update(&ci.CM); err != nil {
+		return fmt.Errorf("could not get basic profiles: %w", err)
 	}
+
+	addonProfiles = config.NewConfigObject[handler.RadiusUserFile]("addonProfiles.json")
+	if err = addonProfiles.Update(&ci.CM); err != nil {
+		return fmt.Errorf("could not get addon profiles: %w", err)
+	}
+
+	fmt.Printf("%v\n", basicProfiles)
 
 	// Radius Checks
 	radiusCheckers, err = handler.NewRadiusPacketChecks("radiusCheckers.json", ci)

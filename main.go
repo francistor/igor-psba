@@ -18,6 +18,7 @@ func main() {
 
 	// defer profile.Start(profile.BlockProfile).Stop()
 
+	// After ^C, signalChan will receive a message
 	doneChan := make(chan struct{}, 1)
 	signalChan := make(chan os.Signal, 1)
 	go func() {
@@ -52,6 +53,7 @@ func main() {
 	// Start server
 	r.Start()
 
+	// Wait for termination signal
 	<-doneChan
 
 	// Close router gracefully
