@@ -1,8 +1,7 @@
-[
-	{
-		"name": "psba-client",
+{
+	"127.0.0.1":{
 		"IPAddress": "127.0.0.1",
 		"secret": "secret",
 		"clientClass": "BNG"
 	}
-]
+}

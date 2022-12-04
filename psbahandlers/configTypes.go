@@ -7,9 +7,21 @@ import (
 	"strings"
 
 	"github.com/francistor/igor/config"
-	"github.com/francistor/igor/handlerfunctions"
+	"github.com/francistor/igor/handler"
 	"github.com/francistor/igor/radiuscodec"
 )
+
+type DatabaseConfig struct {
+	Url          string
+	Driver       string
+	MaxOpenConns int
+	MaxIdleConns int
+}
+
+type PlanTemplateParams struct {
+	Speed   int
+	Message string
+}
 
 type CDRWriter struct {
 	Path            string
@@ -108,7 +120,7 @@ func (g HandlerConfig) String() string {
 }
 
 // Overrides the configuration properties with other taken from userfile config items
-func (g HandlerConfig) OverrideWith(props handlerfunctions.Properties, hl *config.HandlerLogger) HandlerConfig {
+func (g HandlerConfig) OverrideWith(props handler.Properties, hl *config.HandlerLogger) HandlerConfig {
 
 	l := hl.L
 
@@ -212,10 +224,4 @@ func (g HandlerConfig) OverrideWith(props handlerfunctions.Properties, hl *confi
 	}
 
 	return g
-}
-
-type DatabaseConfig struct {
-	Url        string
-	Driver     string
-	NumThreads int
 }

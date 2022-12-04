@@ -1,7 +1,6 @@
-[
-	{
+{
+	"127.0.0.1":{
 		"name": "psba-server",
-		"IPAddress": "127.0.0.1",
 		"secret": "secret"
 	}
-]
+}

@@ -60,7 +60,7 @@ func AccountingRequestHandler(request *radiuscodec.RadiusPacket, ctx *RequestCon
 			l.Debugf("copy to %s -> group: %s", ct.TargetName, ct.ProxyGroupName)
 			// Generate the copy to be sent to the proxy
 			// Ignore the error because the check was done at initialization time
-			reqCopy, _ := radiusFilters.FilteredPacket(ct.FilterName, request)
+			reqCopy, _ := radiusFilters.FilteredPacket(request, ct.FilterName)
 			l.Debugf("sending radius packet to %s %s", ct.ProxyGroupName, reqCopy)
 
 			// Do proxy asycnronously
@@ -82,7 +82,7 @@ func AccountingRequestHandler(request *radiuscodec.RadiusPacket, ctx *RequestCon
 	// Inline proxy
 	if ctx.config.ProxyGroupName != "" && ((serviceName != "" && ctx.config.ProxyServiceAccounting) || (serviceName == "" && ctx.config.ProxySessionAccounting)) {
 		l.Debugf("proxy to %s", ctx.config.ProxyGroupName)
-		reqCopy, _ := radiusFilters.FilteredPacket(ctx.config.AcctProxyFilterOut, request)
+		reqCopy, _ := radiusFilters.FilteredPacket(request, ctx.config.AcctProxyFilterOut)
 		_, err := radiusRouter.RouteRadiusRequest(reqCopy, ctx.config.ProxyGroupName, time.Duration(ctx.config.ProxyTimeoutMillis)*time.Millisecond, 1+ctx.config.ProxyRetries, 1+ctx.config.ProxyServerRetries, "")
 		if err != nil {
 			l.Warn("error proxying to %s: %s", ctx.config.ProxyGroupName, err)

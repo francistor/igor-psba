@@ -26,21 +26,28 @@ var testInvoker TestInvoker
 
 func TestMain(m *testing.M) {
 
-	// Initialize the Config Object as done in main.go
+	// Clean cdr files
+	os.RemoveAll(os.Getenv("IGOR_BASE") + "/cdr/session")
+	os.RemoveAll(os.Getenv("IGOR_BASE") + "/cdr/service")
+
 	bootstrapFile := "resources/searchRules.json"
 
-	// Initialize policy
+	// Spawn three instances of router: client, server and superserver
+
+	// Initialize policy instances
 	config.InitPolicyConfigInstance(bootstrapFile, "clientpsba", true)
 	serverCInstance := config.InitPolicyConfigInstance(bootstrapFile, "serverpsba", false)
 	config.InitPolicyConfigInstance(bootstrapFile, "superserverpsba", false)
 
+	// Initialize the routers
 	clientRouter = router.NewRadiusRouter("clientpsba", psbahandlers.VoidHandler)
 	serverRouter = router.NewRadiusRouter("serverpsba", psbahandlers.RequestHandler)
 	superserverRouter = router.NewRadiusRouter("superserverpsba", psbahandlers.SuperserverHandler)
 
+	// Initialize a router in the client
 	clientHttpRouter = httprouter.NewHttpRouter("clientpsba", nil, clientRouter)
 
-	// Initialize handler
+	// Initialize handler for the server. The superserver will use test Handlers that do not require initialization
 	if err := psbahandlers.InitHandler(serverCInstance, serverRouter); err != nil {
 		panic(err)
 	}
@@ -63,10 +70,6 @@ func TestMain(m *testing.M) {
 		Url:         "https://localhost:20000/routeRadiusRequest",
 		Http2Client: http2Client,
 	}
-
-	// Clean cdr files
-	os.RemoveAll(os.Getenv("IGOR_BASE") + "/cdr/session")
-	os.RemoveAll(os.Getenv("IGOR_BASE") + "/cdr/service")
 
 	// Execute the tests
 	exitCode := m.Run()

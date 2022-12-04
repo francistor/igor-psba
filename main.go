@@ -8,7 +8,7 @@ import (
 	"syscall"
 
 	"github.com/francistor/igor/config"
-	"github.com/francistor/igor/handlerfunctions"
+	"github.com/francistor/igor/handler"
 	"github.com/francistor/igor/router"
 
 	"github.com/francistor/igor-psba/psbahandlers"
@@ -40,7 +40,7 @@ func main() {
 	logger := config.GetLogger()
 
 	// Start Radius
-	r := router.NewRadiusRouter(*instancePtr, handlerfunctions.EmptyRadiusHandler)
+	r := router.NewRadiusRouter(*instancePtr, handler.EmptyRadiusHandler)
 	logger.Info("Radius router started")
 
 	// Initialize handler. Reads configuration files

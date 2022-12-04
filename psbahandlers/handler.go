@@ -1,17 +1,15 @@
 package psbahandlers
 
 import (
-	"encoding/json"
 	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/francistor/igor/cdrwriter"
 	"github.com/francistor/igor/config"
-	"github.com/francistor/igor/handlerfunctions"
+	"github.com/francistor/igor/handler"
 	"github.com/francistor/igor/radiuscodec"
 	"github.com/francistor/igor/router"
 
@@ -20,6 +18,10 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
+// Regex for the nas-port-id in pseudowire format
+var pwRegex = regexp.MustCompile(`^([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+):(([0-9]+)-)?([0-9]+)$`)
+
+// To pass info from the Main handler to the packet-type specific handlers
 type RequestContext struct {
 	accessId         string
 	accessPort       int64
@@ -27,154 +29,145 @@ type RequestContext struct {
 	realm            string
 	radiusClientType string
 	macAddress       string
-	radiusAttributes handlerfunctions.AVPItems
-	config           HandlerConfig
+
+	// Merged configuration from realm > client > global
+	config HandlerConfig
+
+	// Attributes merged from realm > client > global
+	radiusAttributes   handler.AVPItems
+	noRadiusAttributes handler.AVPItems
 }
 
 // Handler variables. Populated on initialization
 var radiusRouter *router.RadiusRouter
+var confMgr *config.PolicyConfigurationManager
 
-var databaseConfig DatabaseConfig
+var databaseConfig *config.ConfigObject[DatabaseConfig]
 var dbHandle *sql.DB
 
 // Configuration files
-var handlerConfig HandlerConfig
-var radiusClients config.RadiusClients
-var radiusServers config.RadiusServers
-var realms handlerfunctions.RadiusUserFile
-var profiles handlerfunctions.RadiusUserFile
-var specialUsers handlerfunctions.RadiusUserFile
+var handlerConfig *config.ConfigObject[HandlerConfig]
+var realms *config.ConfigObject[handler.RadiusUserFile]
+var specialUsers *config.ConfigObject[handler.RadiusUserFile]
+var profiles *config.TemplatedConfigObject[handler.RadiusUserFile, PlanTemplateParams]
 
-var radiusCheckers handlerfunctions.RadiusPacketChecks
-var radiusFilters handlerfunctions.AVPFilters
-
-var pwRegex = regexp.MustCompile(`^([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+):(([0-9]+)-)?([0-9]+)$`)
+var radiusCheckers handler.RadiusPacketChecks
+var radiusFilters handler.AVPFilters
 
 // CDR Writers
 var cdrWriters []*cdrwriter.FileCDRWriter
 var cdrWriteCheckers []string
-
-// PlanParameter cache
-var planCache *PlanCache
 
 // Populates database config
 func InitHandler(ci *config.PolicyConfigurationManager, r *router.RadiusRouter) error {
 
 	var err error
 
-	// Read database configuration
-	if jc, err := ci.CM.GetConfigObjectAsText("clientsDatabase.json", true); err != nil {
-		return fmt.Errorf("could not read clientsDatabase.json file %w", err)
-	} else {
-		if err = json.Unmarshal(jc, &databaseConfig); err != nil {
-			return fmt.Errorf("could not unmarshal clientsDatabase.json %w", err)
-		}
-	}
-
 	// Set the router variable
 	radiusRouter = r
 
+	// Set the configuration instance variable
+	confMgr = ci
+
+	// Read database configuration
+	databaseConfig = config.NewConfigObject[DatabaseConfig]("clientsDatabase.json")
+	if err := databaseConfig.Update(&ci.CM); err != nil {
+		return fmt.Errorf("could not read clientsDatabase.json file %w", err)
+	}
+
 	// Create the database object
-	dbHandle, err = sql.Open(databaseConfig.Driver, databaseConfig.Url)
+	var dbCfg = databaseConfig.Get()
+	dbHandle, err = sql.Open(dbCfg.Driver, dbCfg.Url)
 	if err != nil {
 		return fmt.Errorf("could not create database object %w", err)
 	}
+	dbHandle.SetMaxOpenConns(dbCfg.MaxOpenConns)
+	dbHandle.SetMaxIdleConns(dbCfg.MaxIdleConns)
+
+	// Check the database connection
 	err = dbHandle.Ping()
 	if err != nil {
 		// If the database is not available, die
-		config.GetLogger().Errorf("could not ping database %s %s", databaseConfig.Driver, databaseConfig.Url)
+		config.GetLogger().Errorf("could not ping database %s %s", dbCfg.Driver, dbCfg.Url)
 		panic("could not ping database")
 	}
 
 	////////////////////////////////////////////////////////////////////////
-	// Start the cache
-	////////////////////////////////////////////////////////////////////////
-	planCache = NewPlanCache(dbHandle, 1*time.Second)
-	planCache.Start()
-
-	////////////////////////////////////////////////////////////////////////
-	// Populate the configuration files
+	// Initialize configuration objects
 	////////////////////////////////////////////////////////////////////////
 
-	// Radius Clients
-	radiusClients = ci.RadiusClientsConf()
+	// These configuration items are updateable
 
-	// Radius Servers
-	radiusServers = ci.RadiusServersConf()
+	// Global configuration
+	handlerConfig = config.NewConfigObject[HandlerConfig]("globalConfig.json")
+	if err = handlerConfig.Update(&ci.CM); err != nil {
+		return fmt.Errorf("could not read globalConfig.json: %w", err)
+	}
+	hc := handlerConfig.Get()
 
 	// special users
-	specialUsers, err = handlerfunctions.NewRadiusUserFile("specialUsers.json", ci)
-	if err != nil {
+	specialUsers = config.NewConfigObject[handler.RadiusUserFile]("specialUsers.json")
+	if err = specialUsers.Update(&ci.CM); err != nil {
 		return fmt.Errorf("could not get special users configuration: %w", err)
 	}
 
 	// Realm config
-	realms, err = handlerfunctions.NewRadiusUserFile("realms.json", ci)
-	if err != nil {
+	realms = config.NewConfigObject[handler.RadiusUserFile]("realms.json")
+	if err = realms.Update(&ci.CM); err != nil {
 		return fmt.Errorf("could not get realm configuration: %w", err)
 	}
 
 	// Service configuration
-	profiles, err = handlerfunctions.NewRadiusUserFile("profiles.json", ci)
-	if err != nil {
+	profiles = config.NewTemplatedConfigObject[handler.RadiusUserFile, PlanTemplateParams]("profiles.json", "planparameters")
+	if err = profiles.Update(&ci.CM); err != nil {
 		return fmt.Errorf("could not get profiles configuration.json: %w", err)
 	}
 
 	// Radius Checks
-	radiusCheckers, err = handlerfunctions.NewRadiusPacketChecks("radiusCheckers.json", ci)
+	radiusCheckers, err = handler.NewRadiusPacketChecks("radiusCheckers.json", ci)
 	if err != nil {
 		return fmt.Errorf("could not get radius checks: %w", err)
 	}
 
 	// Radius Filters
-	radiusFilters, err = handlerfunctions.NewAVPFilters("radiusFilters.json", ci)
+	radiusFilters, err = handler.NewAVPFilters("radiusFilters.json", ci)
 	if err != nil {
 		return fmt.Errorf("could not get radius filters: %w", err)
 	}
 
-	// Global configuration
-	gJson, err := ci.CM.GetConfigObjectAsText("globalConfig.json", true)
-	if err != nil {
-		return fmt.Errorf("could not read globalConfig.json: %w", err)
-	}
-	err = json.Unmarshal(gJson, &handlerConfig)
-	if err != nil {
-		return fmt.Errorf("could not unmarshal globalConfig.json: %w", err)
-	}
-
 	// Sanity checks copy targets
-	for _, ct := range handlerConfig.CopyTargets {
+	for _, ct := range hc.CopyTargets {
 		if _, found := radiusCheckers[ct.CheckerName]; !found {
 			panic(fmt.Sprintf("checker %s not found", ct.CheckerName))
 		}
 		if _, found := radiusFilters[ct.FilterName]; !found {
 			panic(fmt.Sprintf("checker %s not found", ct.FilterName))
 		}
-		if _, found := radiusServers.ServerGroups[ct.ProxyGroupName]; !found {
+		if _, found := ci.RadiusServers().ServerGroups[ct.ProxyGroupName]; !found {
 			panic(fmt.Sprintf("proxy group %s not found", ct.ProxyGroupName))
 		}
 	}
 
 	// Sanity checks for global config
-	if _, found := radiusFilters[handlerConfig.AuthProxyFilterIn]; !found {
-		panic(fmt.Sprintf("filter %s not found", handlerConfig.AuthProxyFilterIn))
+	if _, found := radiusFilters[hc.AuthProxyFilterIn]; !found {
+		panic(fmt.Sprintf("filter %s not found", hc.AuthProxyFilterIn))
 	}
-	if _, found := radiusFilters[handlerConfig.AuthProxyFilterOut]; !found {
-		panic(fmt.Sprintf("filter %s not found", handlerConfig.AuthProxyFilterOut))
+	if _, found := radiusFilters[hc.AuthProxyFilterOut]; !found {
+		panic(fmt.Sprintf("filter %s not found", hc.AuthProxyFilterOut))
 	}
-	if _, found := radiusFilters[handlerConfig.AcctProxyFilterOut]; !found {
-		panic(fmt.Sprintf("filter %s not found", handlerConfig.AcctProxyFilterOut))
+	if _, found := radiusFilters[hc.AcctProxyFilterOut]; !found {
+		panic(fmt.Sprintf("filter %s not found", hc.AcctProxyFilterOut))
 	}
-	if handlerConfig.ProxyGroupName != "" {
-		if _, found := radiusServers.ServerGroups[handlerConfig.ProxyGroupName]; !found {
-			panic(fmt.Sprintf("proxy group %s not found", handlerConfig.ProxyGroupName))
+	if hc.ProxyGroupName != "" {
+		if _, found := ci.RadiusServers().ServerGroups[hc.ProxyGroupName]; !found {
+			panic(fmt.Sprintf("proxy group %s not found", hc.ProxyGroupName))
 		}
 	}
 
 	////////////////////////////////////////////////////////////////////////
 	// Create CDR writers
 	////////////////////////////////////////////////////////////////////////
-	for _, w := range handlerConfig.CDRWriters {
+	for _, w := range hc.CDRWriters {
 		var cdrf cdrwriter.CDRFormatter
 		var attrs []string
 		if w.Attributes != "" {
@@ -206,13 +199,13 @@ func CloseHandler() {
 	if dbHandle != nil {
 		dbHandle.Close()
 	}
-	if planCache != nil {
-		planCache.Close()
-	}
 }
 
 // Main entry point
 func RequestHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
+
+	// Get my copy of the configuration
+	var handlerConfig = handlerConfig.Get()
 
 	hl := config.NewHandlerLogger()
 	l := hl.L
@@ -252,6 +245,9 @@ func RequestHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacke
 		realm = userNameComponents[1]
 	}
 	l.Debugf("realm: %s", realm)
+
+	// Get my realm
+	realmEntry := realms.Get()[realm]
 
 	var macAddress = ""
 	if addr := request.GetStringAVP("Hw-User-MAC"); addr != "" {
@@ -309,8 +305,8 @@ func RequestHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacke
 	request.Add("PSA-AccessPort", int(accessPort))
 
 	// Merge the configuration. Priority is realm > client > global
-	var clientConfig handlerfunctions.Properties = radiusClients[nasipAddr].ClientProperties
-	var realmConfig handlerfunctions.Properties = realms[realm].ConfigItems
+	var clientConfig handler.Properties = confMgr.RadiusClients()[nasipAddr].ClientProperties
+	var realmConfig handler.Properties = realmEntry.ConfigItems
 	requestConfig := handlerConfig.OverrideWith(clientConfig.OverrideWith(realmConfig), hl)
 
 	if config.IsDebugEnabled() {
@@ -322,31 +318,32 @@ func RequestHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacke
 
 	// Merge the reply attributes. Priority is realm > global
 	// TODO: Get attributes from radius client
-	var radiusAttributes handlerfunctions.AVPItems = handlerConfig.RadiusAttrs
-	radiusAttributes = radiusAttributes.OverrideWith(realms[realm].ReplyItems)
+	var radiusAttributes handler.AVPItems = handlerConfig.RadiusAttrs
+	radiusAttributes = radiusAttributes.OverrideWith(realmEntry.ReplyItems)
 
-	var noRadiusAttributes handlerfunctions.AVPItems = handlerConfig.NonOverridableRadiusAttrs
-	noRadiusAttributes = realms[realm].NonOverridableReplyItems.Add(handlerConfig.NonOverridableRadiusAttrs)
+	var noRadiusAttributes handler.AVPItems = handlerConfig.NonOverridableRadiusAttrs
+	noRadiusAttributes = realmEntry.NonOverridableReplyItems.Add(handlerConfig.NonOverridableRadiusAttrs)
 
 	if config.IsDebugEnabled() {
 		l.Debugf("handler attributes: %s", handlerConfig.RadiusAttrs)
-		l.Debugf("realm attributes: %s", realms[realm].ReplyItems)
+		l.Debugf("realm attributes: %s", realmEntry.ReplyItems)
 		l.Debugf("merged attributes: %s", radiusAttributes)
 		l.Debugf("no-handler attributes: %s", handlerConfig.NonOverridableRadiusAttrs)
-		l.Debugf("no-realm attributes: %s", realms[realm].NonOverridableReplyItems)
+		l.Debugf("no-realm attributes: %s", realmEntry.NonOverridableReplyItems)
 		l.Debugf("no-merged attributes: %s", noRadiusAttributes)
 	}
 
 	// Build Request context
 	ctx := RequestContext{
-		accessId:         accessId,
-		accessPort:       accessPort,
-		userName:         userName,
-		realm:            realm,
-		radiusClientType: radiusClientType,
-		macAddress:       macAddress,
-		radiusAttributes: radiusAttributes,
-		config:           requestConfig,
+		accessId:           accessId,
+		accessPort:         accessPort,
+		userName:           userName,
+		realm:              realm,
+		radiusClientType:   radiusClientType,
+		macAddress:         macAddress,
+		radiusAttributes:   radiusAttributes,
+		noRadiusAttributes: noRadiusAttributes,
+		config:             requestConfig,
 	}
 
 	// Call the corresponding handler

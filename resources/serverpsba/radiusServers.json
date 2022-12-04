@@ -1,23 +1,19 @@
 {
-	"servers" : 
-	[
-		{
-        "name": "psba-superserver",
-        "IPAddress": "localhost",
-        "secret": "secret",
-        "authPort": 11812,
-        "acctPort": 11813,
-        "coaPort": 13799,
-        "errorLimit": 3,
-        "quarantineTimeSeconds": 60
-      }
-	],
-	"serverGroups" :
-	[
-	  {
-        "name": "psba-superserver-group",
-        "servers": ["psba-superserver"],
-        "policy": "fixed"
-      }
-	]
+	"servers" : {
+    "psba-superserver": {
+      "IPAddress": "localhost",
+      "secret": "secret",
+      "authPort": 11812,
+      "acctPort": 11813,
+      "coaPort": 13799,
+      "errorLimit": 3,
+      "quarantineTimeSeconds": 60
+    }
+  },
+	"serverGroups" :{
+    "psba-superserver-group":{
+      "servers": ["psba-superserver"],
+      "policy": "fixed"
+    }
+  }
 }

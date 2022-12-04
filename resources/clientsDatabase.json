@@ -2,5 +2,6 @@
 	"__doc": "use loc=UTC if necessary",
 	"url": "francisco:francisco@tcp(n2:3306)/PSBA?parseTime=true",
 	"driver": "mysql",
-	"numThreads": 10
+	"maxOpenConns": 10,
+	"maxIdleConns": 1
 }

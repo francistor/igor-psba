@@ -73,7 +73,7 @@ func AccessRequestHandler(request *radiuscodec.RadiusPacket, ctx *RequestContext
 			l.Debugf("not verifying unprovisioned login")
 		}
 	case "file":
-		if userEntry, found := specialUsers[clientpou.UserName]; found {
+		if userEntry, found := specialUsers.Get()[clientpou.UserName]; found {
 			if request.GetPasswordStringAVP("User-Password") != userEntry.CheckItems["password"] {
 				l.Debugf("incorrect password")
 				rejectReason = "Authorization rejected (file) for " + clientpou.UserName
@@ -128,7 +128,7 @@ func AccessRequestHandler(request *radiuscodec.RadiusPacket, ctx *RequestContext
 		if ctx.config.ProxyGroupName != "" && ctx.config.ProxyGroupName != "none" {
 
 			// Filter
-			proxyRequest, err := radiusFilters.FilteredPacket(ctx.config.AuthProxyFilterOut, request)
+			proxyRequest, err := radiusFilters.FilteredPacket(request, ctx.config.AuthProxyFilterOut)
 			if err != nil {
 				return nil, fmt.Errorf("could not apply filter %s: %w", ctx.config.AuthProxyFilterOut, err)
 			}
@@ -160,7 +160,7 @@ func AccessRequestHandler(request *radiuscodec.RadiusPacket, ctx *RequestContext
 				rejectReason = "rejected by upstream radius: " + proxyReply.GetStringAVP("Reply-Message")
 			} else {
 				// Access Accept
-				filteredProxyReply, err := radiusFilters.FilteredPacket(ctx.config.AuthProxyFilterIn, proxyReply)
+				filteredProxyReply, err := radiusFilters.FilteredPacket(proxyReply, ctx.config.AuthProxyFilterIn)
 				if err != nil {
 					return nil, fmt.Errorf("could not apply filter %s: %w", ctx.config.AuthProxyFilterIn, err)
 				}

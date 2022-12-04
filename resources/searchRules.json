@@ -1,4 +1,14 @@
+{
+    "rules": [
+        {"nameRegex": "(planparameters)",     "origin": "database:planParameters:PlanName:Parameters"},
+        {"nameRegex": "(.*)",     "origin": "resources/"}
+    ],
+    "db": {
+        "__doc": "use loc=UTC if necessary",
+        "url": "francisco:francisco@tcp(n2:3306)/PSBA?parseTime=true",
+        "driver": "mysql",
+        "maxOpenConns": 10,
+        "maxIdleConns": 1
+    }
+}
 
-[
-    {"nameRegex": "(.*)",     "base": "resources/"}
-]
