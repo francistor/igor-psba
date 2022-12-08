@@ -70,7 +70,8 @@
 	"notificationIsAddon": true,
 
 	"radiusAttrs":[
-		{"Session-Timeout": 3600}
+		{"Redback-Client-DNS-Primary": "8.8.8.8"},
+		{"Redback-Client-DNS-Secondary": "8.8.8.8"}
 	],
 	"nonOverridableRadiusAttrs": [
 		{"Cisco-AVPair": "global=true"}

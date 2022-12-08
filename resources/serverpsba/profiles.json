@@ -1,85 +1,85 @@
 {
 	"permissive":{
-		"radiusAttrs":[
+		"replyItems":[
 			{"Unisphere-Service-Bundle": "Apermissive"},
 			{"Session-Timeout": 2400}
 		],
-		"nonOverridableRadiusAttrs":[
+		"nonOverridableReplyItems":[
 			{"HW-Account-Info": "Apermissive"}
 		]
 	},
 
 	"pcautiv":{
-		"radiusAttrs":[
+		"replyItems":[
 			{"Unisphere-Service-Bundle": "Apcautiv"}
 		],
-		"nonOverridableRadiusAttrs":[
+		"nonOverridablereplyItems":[
 			{"HW-Account-Info": "Apcautiv"}
 		]
 	},
 
 	"reject":{
-		"radiusAttrs":[
+		"replyItems":[
 			{"Unisphere-Service-Bundle": "Apreject"}
 		],
-		"nonOverridableRadiusAttrs":[
+		"nonOverridablereplyItems":[
 			{"HW-Account-Info": "Areject"}
 		]
 	},
 
 	"addon_1":{
-		"radiusAttrs":[
+		"replyItems":[
 			{"Session-Timeout": "300"}
 		],
-		"nonOverridableRadiusAttrs":[
+		"nonOverridablereplyItems":[
 			{"HW-Account-Info": "Aaddon_1"}
 		]
 	},
 
 	"vala":{
-		"radiusAttrs":[
+		"replyItems":[
 			{"Unisphere-Service-Bundle": "Avala"}
 		],
-		"nonOverridableRadiusAttrs":[
+		"nonOverridablereplyItems":[
 			{"HW-Account-Info": "Avala"}
 		]
 	},
 
 	"addon_vala":{
-		"radiusAttrs":[
+		"replyItems":[
 			{"Session-Timeout": "900"}
 		],
-		"nonOverridableRadiusAttrs":[
+		"nonOverridablereplyItems":[
 			{"HW-Account-Info": "Aaddon_vala"}
 		]
 	},
 
 	"rejectOnline":{
-		"nonOverridableRadiusAttrs":[
+		"nonOverridablereplyItems":[
 			{"HW-Account-Info": "ArejectOnline"}
 		]
 	},
 
 	"pcautivOnline":{
-		"nonOverridableRadiusAttrs":[
+		"nonOverridablereplyItems":[
 			{"HW-Account-Info": "ApcautivOnline"}
 		]
 	},
 	
 	"acs":{
-		"radiusAttrs":[
+		"replyItems":[
 			{"Unisphere-Service-Bundle": "Aacs"}
 		],
-		"nonOverridableRadiusAttrs":[
+		"nonOverridablereplyItems":[
 			{"HW-Account-Info": "Aacs"}
 		]
 	},
 	
 	"betatester":{
-		"radiusAttrs":[
+		"replyItems":[
 			{"Unisphere-Service-Bundle": "Abetatester"}
 		],
-		"nonOverridableRadiusAttrs":[
+		"nonOverridablereplyItems":[
 			{"HW-Account-Info": "Abetatester"}
 		]
 	}

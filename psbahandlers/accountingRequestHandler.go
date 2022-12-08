@@ -4,11 +4,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/francistor/igor/config"
-	"github.com/francistor/igor/radiuscodec"
+	"github.com/francistor/igor/core"
 )
 
-func AccountingRequestHandler(request *radiuscodec.RadiusPacket, ctx *RequestContext, hl *config.HandlerLogger, wg *sync.WaitGroup) (*radiuscodec.RadiusPacket, error) {
+func AccountingRequestHandler(request *core.RadiusPacket, ctx *RequestContext, hl *core.HandlerLogger, wg *sync.WaitGroup) (*core.RadiusPacket, error) {
 
 	l := hl.L
 
@@ -68,7 +67,7 @@ func AccountingRequestHandler(request *radiuscodec.RadiusPacket, ctx *RequestCon
 			go func() {
 				defer wg.Done()
 				if _, err := radiusRouter.RouteRadiusRequest(reqCopy, ct.ProxyGroupName, time.Duration(ct.ProxyTimeoutMillis)*time.Millisecond, 1+ct.ProxyRetries, 1+ct.ProxyServerRetries, ""); err != nil {
-					config.GetLogger().Warnf("error sending copy to %s: %s", ct.ProxyGroupName, err)
+					core.GetLogger().Warnf("error sending copy to %s: %s", ct.ProxyGroupName, err)
 				} else {
 					l.Debugf("proxy done")
 				}
@@ -89,7 +88,7 @@ func AccountingRequestHandler(request *radiuscodec.RadiusPacket, ctx *RequestCon
 		}
 	}
 
-	response := radiuscodec.NewRadiusResponse(request, true)
+	response := core.NewRadiusResponse(request, true)
 
 	return response, nil
 }

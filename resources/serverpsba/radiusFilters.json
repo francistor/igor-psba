@@ -19,5 +19,8 @@
       "force": [
         ["Service-Type", "Login"]
       ]
-  }
+    },
+    "altProxyIn":{
+      "remove": ["User-Password"]
+    }
 }

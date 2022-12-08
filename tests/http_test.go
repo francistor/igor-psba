@@ -15,7 +15,7 @@ func TestSimpleAccessRequest(t *testing.T) {
 		"packet": {
 			"Code": 1,
 			"AVPs":[
-				{"User-Name":"francisco@database.provision.nopermissive.reject_addon.pcautiv_addon.proxy"},
+				{"User-Name":"francisco@database.provision.nopermissive.doreject.block_addon.proxy"},
 				{"User-Password": "${password}"},
 				{"NAS-IP-Address": "127.0.0.1"},
 				{"NAS-Port": 2},
@@ -30,7 +30,7 @@ func TestSimpleAccessRequest(t *testing.T) {
 	jRadiusRequest = strings.ReplaceAll(jRadiusRequest, "${password}", fmt.Sprintf("%x", []byte("francisco")))
 
 	checks := []TestCheck{
-		{"avp is", "User-Name", "francisco@database.provision.nopermissive.reject_addon.pcautiv_addon.proxy"},
+		{"avp is", "User-Name", "francisco@database.provision.nopermissive.doreject.block_addon.proxy"},
 		{"avp is", "Igor-OctetsAttribute", "01"},
 	}
 	testInvoker.testCaseJSON(t, "simple access request", checks, jRadiusRequest)
@@ -45,7 +45,7 @@ func TestSimpleSessionAccountingRequest(t *testing.T) {
 		"packet": {
 			"Code": 4,
 			"AVPs":[
-				{"User-Name":"francisco@database.provision.nopermissive.reject_addon.pcautiv_addon.proxy"},
+				{"User-Name":"francisco@database.provision.nopermissive.doreject.block_addon.proxy"},
 				{"NAS-IP-Address": "127.0.0.1"},
 				{"NAS-Port": 1},
 				{"Igor-OctetsAttribute": "01"},
@@ -72,7 +72,7 @@ func TestSimpleServiceAccountingRequest(t *testing.T) {
 		"packet": {
 			"Code": 4,
 			"AVPs":[
-				{"User-Name":"francisco@database.provision.nopermissive.reject_addon.pcautiv_addon.proxy"},
+				{"User-Name":"francisco@database.provision.nopermissive.doreject.block_addon.proxy"},
 				{"NAS-IP-Address": "127.0.0.1"},
 				{"NAS-Port": 1},
 				{"Igor-OctetsAttribute": "01"},

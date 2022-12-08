@@ -6,9 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/francistor/igor/config"
+	"github.com/francistor/igor/core"
 	"github.com/francistor/igor/handler"
-	"github.com/francistor/igor/radiuscodec"
 )
 
 type DatabaseConfig struct {
@@ -84,13 +83,11 @@ type HandlerConfig struct {
 	// Whether to validate the credentials locally, irrespective of whether a proxy is performed. May be "provision" or "file"
 	AuthLocal string
 
-	// Whether to send Access-Reject to users not provisioned or with bad credentials
-	RejectProfile string
-	// The reject service may replace the basic service or be configured as an addon service
-	RejectIsAddon bool
-
 	// Users not found in database
 	PermissiveProfile string
+
+	// Whether to send Access-Reject to users not provisioned or with bad credentials
+	RejectProfile string
 
 	// Whether to send Access-Reject to blocked user
 	BlockingProfile               string
@@ -104,8 +101,8 @@ type HandlerConfig struct {
 	NotificationIsAddon bool
 
 	// Global Radius attributes to send
-	RadiusAttrs               []radiuscodec.RadiusAVP
-	NonOverridableRadiusAttrs []radiuscodec.RadiusAVP
+	RadiusAttrs               []core.RadiusAVP
+	NonOverridableRadiusAttrs []core.RadiusAVP
 }
 
 // Stringer iterface
@@ -120,7 +117,7 @@ func (g HandlerConfig) String() string {
 }
 
 // Overrides the configuration properties with other taken from userfile config items
-func (g HandlerConfig) OverrideWith(props handler.Properties, hl *config.HandlerLogger) HandlerConfig {
+func (g HandlerConfig) OverrideWith(props handler.Properties, hl *core.HandlerLogger) HandlerConfig {
 
 	l := hl.L
 
@@ -188,15 +185,9 @@ func (g HandlerConfig) OverrideWith(props handler.Properties, hl *config.Handler
 			g.ProvisionType = props[key]
 		case "authlocal":
 			g.AuthLocal = props[key]
-		case "rejectisaddon":
-			if v, err := strconv.ParseBool(props[key]); err == nil {
-				g.RejectIsAddon = v
-			} else {
-				l.Errorf("bad format for RejectIsAddon %s", props[key])
-			}
 		case "rejectprofile":
 			g.RejectProfile = props[key]
-		case "permissiveservicename":
+		case "permissiveprofile":
 			g.PermissiveProfile = props[key]
 		case "blockingisaddon":
 			if v, err := strconv.ParseBool(props[key]); err == nil {

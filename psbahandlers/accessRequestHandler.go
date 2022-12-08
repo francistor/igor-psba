@@ -6,11 +6,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/francistor/igor/config"
-	"github.com/francistor/igor/radiuscodec"
+	"github.com/francistor/igor/core"
+	"github.com/francistor/igor/handler"
 )
 
-func AccessRequestHandler(request *radiuscodec.RadiusPacket, ctx *RequestContext, hl *config.HandlerLogger) (*radiuscodec.RadiusPacket, error) {
+func AccessRequestHandler(request *core.RadiusPacket, ctx *RequestContext, hl *core.HandlerLogger) (*core.RadiusPacket, error) {
 
 	now := time.Now()
 
@@ -23,7 +23,7 @@ func AccessRequestHandler(request *radiuscodec.RadiusPacket, ctx *RequestContext
 	var basicProfile string
 	var addonProfile string
 	// Attributes from upstream server
-	var proxyAVPs = make([]radiuscodec.RadiusAVP, 0)
+	var proxyRadiusAttrs = make([]core.RadiusAVP, 0)
 
 	// Find the user
 	clientpou, err := findClient(ctx.userName, ctx.accessPort, ctx.accessId, hl)
@@ -35,7 +35,7 @@ func AccessRequestHandler(request *radiuscodec.RadiusPacket, ctx *RequestContext
 	// Actions if user not found
 	if clientpou.ClientId != 0 {
 		l.Debugf("client found %#v\n", clientpou)
-		//l.Debug(clientpou.NotificationExpDate.Format("2006-01-02T15:04:05 MST"))
+		basicProfile = standardBasicProfileName
 	} else {
 		l.Debug("client not found\n")
 		// If permissiveProfile is defined, we assign that one. Otherwise, signal rejection
@@ -90,7 +90,7 @@ func AccessRequestHandler(request *radiuscodec.RadiusPacket, ctx *RequestContext
 		// Notification --> clientOverrides --> blocked --> realmOverride (--> rejectOverrides)
 
 		// Apply overrides and calculate basic service and addon
-		basicProfile = "basic"
+
 		// Notification overrides
 		if clientpou.NotificationExpDate.After(now) {
 			if ctx.config.NotificationIsAddon {
@@ -134,6 +134,7 @@ func AccessRequestHandler(request *radiuscodec.RadiusPacket, ctx *RequestContext
 			}
 
 			// Do proxy
+			l.Debugf("proxying to %s with attributes %v", ctx.config.ProxyGroupName, proxyRequest.AVPs)
 			proxyReply, err := radiusRouter.RouteRadiusRequest(
 				proxyRequest,
 				ctx.config.ProxyGroupName,
@@ -144,11 +145,12 @@ func AccessRequestHandler(request *radiuscodec.RadiusPacket, ctx *RequestContext
 
 			// Treat error (exit or ignore)
 			if err != nil {
+				l.Debugf("proxy error %s", err)
 				if !ctx.config.AcceptOnProxyError {
 					return nil, fmt.Errorf("proxy error: %w", err)
 				} else {
 					// Fake, accept, empty radius response
-					proxyReply = radiuscodec.NewRadiusResponse(request, true)
+					proxyReply = core.NewRadiusResponse(request, true)
 					l.Debugf("ingoring proxy error %w", err)
 				}
 			} else {
@@ -156,16 +158,18 @@ func AccessRequestHandler(request *radiuscodec.RadiusPacket, ctx *RequestContext
 			}
 
 			// Treat reject
-			if proxyReply.Code == radiuscodec.ACCESS_REJECT {
+			if proxyReply.Code == core.ACCESS_REJECT {
+				l.Debug("access reject")
 				rejectReason = "rejected by upstream radius: " + proxyReply.GetStringAVP("Reply-Message")
 			} else {
 				// Access Accept
+				l.Debug("access accept")
 				filteredProxyReply, err := radiusFilters.FilteredPacket(proxyReply, ctx.config.AuthProxyFilterIn)
 				if err != nil {
 					return nil, fmt.Errorf("could not apply filter %s: %w", ctx.config.AuthProxyFilterIn, err)
 				}
-				proxyAVPs = filteredProxyReply.AVPs
-				l.Debugf("filtered proxy reply attributes: %s", proxyAVPs)
+				proxyRadiusAttrs = filteredProxyReply.AVPs
+				l.Debugf("filtered proxy reply attributes: %s", proxyRadiusAttrs)
 			}
 		}
 	}
@@ -174,79 +178,85 @@ func AccessRequestHandler(request *radiuscodec.RadiusPacket, ctx *RequestContext
 	if rejectReason != "" {
 		// Just a normal reject
 		if ctx.config.RejectProfile == "" {
-
-			response := radiuscodec.NewRadiusResponse(request, false)
+			l.Debugf("sending reject with reason %s", rejectReason)
+			response := core.NewRadiusResponse(request, false)
 			response.Add("Reply-Message", rejectReason)
 			return response, nil
 		}
 
-		if ctx.config.RejectIsAddon {
-			addonProfile = ctx.config.RejectProfile
-			l.Debugf("applying reject addon <%s>", addonProfile)
-		} else {
-			basicProfile = ctx.config.RejectProfile
-			addonProfile = ""
-			l.Debugf("applying reject basic profile <%s>", basicProfile)
-		}
+		l.Debugf("applying reject basic profile <%s>", basicProfile)
+		basicProfile = ctx.config.RejectProfile
+		addonProfile = ""
 	}
 
 	// Compose final response
 
-	/*
-			// Get basic service attributes
-		                  val serviceAVPList = getRadiusAttrs(jServiceConfig, fServiceNameOption, "radiusAttrs")
-		                  val noServiceAVPList = getRadiusAttrs(jServiceConfig, fServiceNameOption, "nonOverridableRadiusAttrs")
+	// Get the basic profile radius attributes
+	l.Debugf("composing final response with basicProfile <%s> and addonProfile <%s>", basicProfile, addonProfile)
 
-		                  val addonAVPList = if(fAddonServiceNameOption.isDefined) getRadiusAttrs(jServiceConfig, fAddonServiceNameOption, "radiusAttrs") else List()
-		                  val noAddonAVPList = if(fAddonServiceNameOption.isDefined) getRadiusAttrs(jServiceConfig, fAddonServiceNameOption, "nonOverridableRadiusAttrs") else List()
-
-		                  // Get domain attributes
-		                  val realmAVPList = getRadiusAttrs(jRealmConfig, Some(realm), "radiusAttrs")
-		                  val noRealmAVPList = getRadiusAttrs(jRealmConfig, Some(realm), "nonOverridableRadiusAttrs")
-
-		                  // Get global attributes
-		                  val globalAVPList = getRadiusAttrs(jGlobalConfig, None, "radiusAttrs")
-		                  val noGlobalAVPList = getRadiusAttrs(jGlobalConfig, None, "nonOverridableRadiusAttrs")
-
-		                  if(log.isDebugEnabled){
-		                    log.debug("Adding Proxied Attributes: {}", proxyAVPList.map(_.pretty).mkString)
-		                    log.debug("Adding non overridable Addon attributes: {} -> {}", fAddonServiceNameOption, noAddonAVPList.map(_.pretty).mkString)
-		                    log.debug("Adding non overridable Service attributes: {} -> {}", fServiceNameOption, noServiceAVPList.map(_.pretty).mkString)
-		                    log.debug("Adding non overridable realm attributes: {} -> {}", realm, noRealmAVPList.map(_.pretty).mkString)
-		                    log.debug("Adding non overridable global attributes: {}", noGlobalAVPList.map(_.pretty).mkString)
-		                    log.debug("Adding Addon attributes: {} -> {} ", fAddonServiceNameOption, addonAVPList.map(_.pretty).mkString)
-		                    log.debug("Adding Service attributes: {} -> {} ", fServiceNameOption, serviceAVPList.map(_.pretty).mkString)
-		                    log.debug("Adding realm attributes: {} -> {}", realm, realmAVPList.map(_.pretty).mkString)
-		                    log.debug("Adding global attributes: {}", globalAVPList.map(_.pretty).mkString)
-		                  }
-
-		                  // Compose the response packet
-		                  response <<
-		                    proxyAVPList <<
-		                    noAddonAVPList <<
-		                    noServiceAVPList <<
-		                    noRealmAVPList <<
-		                    noGlobalAVPList <<?
-		                    addonAVPList <<?
-		                    serviceAVPList <<?
-		                    realmAVPList <<?
-		                    globalAVPList <<
-		                    ("Class" -> s"S:${fServiceNameOption.getOrElse("none")}") <<
-		                    ("Class" -> s"C:${legacyClientIdOption.getOrElse("not-found")}")
-
-		                  if(fAddonServiceNameOption.isDefined) response << ("Class" -> s"A:${fAddonServiceNameOption.getOrElse("none")}")
-		                  if(ipAddressOption.isDefined) response <:< ("Framed-IP-Address" -> ipAddressOption.get)                           // With Override
-		                  if(delegatedIpv6PrefixOption.isDefined) response <:< ("Delegated-IPv6-Prefix" -> delegatedIpv6PrefixOption.get)   // With Override
-	*/
-
-	l.Debugf("rejectReason: %s, basicProfile: %s, addonProfile: %s", rejectReason, basicProfile, addonProfile)
-
-	response := radiuscodec.NewRadiusResponse(request, true)
-
-	// Echo all attributes
-	for i := range request.AVPs {
-		response.AddAVP(&request.AVPs[i])
+	var basicProfileRadiusAttrs handler.AVPItems
+	var basicProfileNoRadiusAttrs handler.AVPItems
+	if basicProfile == standardBasicProfileName {
+		// If the basic profile is that of the Internet service, take the parametrization from the basicProfiles
+		basicProfileForPlan, err := basicProfiles.GetKey(clientpou.PlanName)
+		if err != nil {
+			l.Errorf("plan %s not found", clientpou.PlanName)
+			return nil, fmt.Errorf("plan %s not found", clientpou.PlanName)
+		}
+		basicProfileRadiusAttrs = basicProfileForPlan[standardBasicProfileName].ReplyItems
+		basicProfileNoRadiusAttrs = basicProfileForPlan[standardBasicProfileName].NonOverridableReplyItems
+	} else {
+		l.Info(profiles.Get())
+		basicProfileRadiusAttrs = profiles.Get()[basicProfile].ReplyItems
+		basicProfileNoRadiusAttrs = profiles.Get()[basicProfile].NonOverridableReplyItems
 	}
+
+	// Get the addon profile radius attributes
+	var addonProfileRadiusAttrs handler.AVPItems
+	var addonProfileNoRadiusAttrs handler.AVPItems
+	if addonProfile != "" {
+		if addon, found := profiles.Get()[addonProfile]; !found {
+			return nil, fmt.Errorf("addon profile not found %s", addonProfile)
+		} else {
+			addonProfileRadiusAttrs = addon.ReplyItems
+			addonProfileNoRadiusAttrs = addon.ReplyItems
+		}
+	}
+
+	// Log
+	if core.IsDebugEnabled() {
+		l.Debugf("basic profile attributes: %s", basicProfileRadiusAttrs)
+		l.Debugf("basic profile no attributes: %s", basicProfileNoRadiusAttrs)
+		l.Debugf("addon profile attributes: %s", addonProfileRadiusAttrs)
+		l.Debugf("addon profile no attributes: %s", addonProfileNoRadiusAttrs)
+	}
+
+	// Merge
+	radiusAttributes := ctx.radiusAttributes.OverrideWith(basicProfileRadiusAttrs).OverrideWith(addonProfileRadiusAttrs).OverrideWith(proxyRadiusAttrs)
+	noRadiusAttributes := ctx.noRadiusAttributes.Add(basicProfileNoRadiusAttrs).Add(addonProfileNoRadiusAttrs)
+
+	// Compose and add class attribute
+	classAttrs := []string{fmt.Sprintf("P:%s", clientpou.PlanName), fmt.Sprintf("C:%s", clientpou.ExternalClientId)}
+	if addonProfile != "" {
+		classAttrs = append(classAttrs, fmt.Sprintf("A:%s", addonProfile))
+	}
+	classRadiusAVP, _ := core.NewRadiusAVP("Class", strings.Join(classAttrs, "#"))
+
+	// Build the response
+	response := core.NewRadiusResponse(request, true).
+		AddAVPs(radiusAttributes).
+		AddAVPs(noRadiusAttributes).
+		AddAVP(classRadiusAVP)
+
+	// Add the Fixed IP addresses if necessary
+	if clientpou.IPv4Address != "" {
+		response.Add("Framed-IP-Address", clientpou.IPv4Address)
+	}
+	if clientpou.IPv6DelegatedPrefix != "" {
+		response.Add("Delegated-IPv6-Prefix", clientpou.IPv6DelegatedPrefix)
+	}
+
+	l.Debugf(response.String())
 
 	return response, nil
 }
@@ -302,7 +312,7 @@ func (p *NullableClientPoU) toPoU() ClientPoU {
 }
 
 // Helper function to get the client from the database
-func findClient(userName string, accessPort int64, accessId string, hl *config.HandlerLogger) (ClientPoU, error) {
+func findClient(userName string, accessPort int64, accessId string, hl *core.HandlerLogger) (ClientPoU, error) {
 
 	l := hl.L
 

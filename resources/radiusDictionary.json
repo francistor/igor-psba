@@ -355,6 +355,16 @@
             "attributes":
             [
                 {
+                    "code": 1,
+                    "name": "Client-DNS-Primary",
+                    "type": "Address"
+                },
+                {
+                    "code": 2,
+                    "name": "Client-DNS-Secondary",
+                    "type": "Address"
+                },
+                {
                     "code": 190,
                     "name": "Service-Name",
                     "type": "String",

@@ -10,11 +10,12 @@ import (
 	"github.com/francistor/igor-psba/psbahandlers"
 	"golang.org/x/net/http2"
 
-	"github.com/francistor/igor/config"
+	"github.com/francistor/igor/core"
 	"github.com/francistor/igor/httprouter"
 	"github.com/francistor/igor/router"
 )
 
+// Variables at the disposal of the tests specified in other files
 var clientRouter *router.RadiusRouter
 var clientHttpRouter *httprouter.HttpRouter
 var serverRouter *router.RadiusRouter
@@ -35,9 +36,9 @@ func TestMain(m *testing.M) {
 	// Spawn three instances of router: client, server and superserver
 
 	// Initialize policy instances
-	config.InitPolicyConfigInstance(bootstrapFile, "clientpsba", true)
-	serverCInstance := config.InitPolicyConfigInstance(bootstrapFile, "serverpsba", false)
-	config.InitPolicyConfigInstance(bootstrapFile, "superserverpsba", false)
+	core.InitPolicyConfigInstance(bootstrapFile, "clientpsba", true)
+	serverCInstance := core.InitPolicyConfigInstance(bootstrapFile, "serverpsba", false)
+	core.InitPolicyConfigInstance(bootstrapFile, "superserverpsba", false)
 
 	// Initialize the routers
 	clientRouter = router.NewRadiusRouter("clientpsba", psbahandlers.VoidHandler)
@@ -66,9 +67,11 @@ func TestMain(m *testing.M) {
 		},
 	}
 
+	// The client http router will be listening in port 20000 (resources/clientpsba/httpRouter.json)
 	testInvoker = TestInvoker{
 		Url:         "https://localhost:20000/routeRadiusRequest",
 		Http2Client: http2Client,
+		RRouter:     clientRouter,
 	}
 
 	// Execute the tests

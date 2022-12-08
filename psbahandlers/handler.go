@@ -8,9 +8,8 @@ import (
 	"sync"
 
 	"github.com/francistor/igor/cdrwriter"
-	"github.com/francistor/igor/config"
+	"github.com/francistor/igor/core"
 	"github.com/francistor/igor/handler"
-	"github.com/francistor/igor/radiuscodec"
 	"github.com/francistor/igor/router"
 
 	"database/sql"
@@ -20,6 +19,8 @@ import (
 
 // Regex for the nas-port-id in pseudowire format
 var pwRegex = regexp.MustCompile(`^([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+):(([0-9]+)-)?([0-9]+)$`)
+
+var standardBasicProfileName = "basic"
 
 // To pass info from the Main handler to the packet-type specific handlers
 type RequestContext struct {
@@ -40,17 +41,17 @@ type RequestContext struct {
 
 // Handler variables. Populated on initialization
 var radiusRouter *router.RadiusRouter
-var confMgr *config.PolicyConfigurationManager
+var confMgr *core.PolicyConfigurationManager
 
-var databaseConfig *config.ConfigObject[DatabaseConfig]
+var databaseConfig *core.ConfigObject[DatabaseConfig]
 var dbHandle *sql.DB
 
 // Configuration files
-var handlerConfig *config.ConfigObject[HandlerConfig]
-var realms *config.ConfigObject[handler.RadiusUserFile]
-var specialUsers *config.ConfigObject[handler.RadiusUserFile]
-var addonProfiles *config.ConfigObject[handler.RadiusUserFile]
-var basicProfiles *config.TemplatedConfigObject[handler.RadiusUserFile, PlanTemplateParams]
+var handlerConfig *core.ConfigObject[HandlerConfig]
+var realms *core.ConfigObject[handler.RadiusUserFile]
+var specialUsers *core.ConfigObject[handler.RadiusUserFile]
+var profiles *core.ConfigObject[handler.RadiusUserFile]
+var basicProfiles *core.TemplatedConfigObject[handler.RadiusUserFile, PlanTemplateParams]
 
 var radiusCheckers handler.RadiusPacketChecks
 var radiusFilters handler.AVPFilters
@@ -60,7 +61,7 @@ var cdrWriters []*cdrwriter.FileCDRWriter
 var cdrWriteCheckers []string
 
 // Populates database config
-func InitHandler(ci *config.PolicyConfigurationManager, r *router.RadiusRouter) error {
+func InitHandler(ci *core.PolicyConfigurationManager, r *router.RadiusRouter) error {
 
 	var err error
 
@@ -71,7 +72,7 @@ func InitHandler(ci *config.PolicyConfigurationManager, r *router.RadiusRouter) 
 	confMgr = ci
 
 	// Read database configuration
-	databaseConfig = config.NewConfigObject[DatabaseConfig]("clientsDatabase.json")
+	databaseConfig = core.NewConfigObject[DatabaseConfig]("clientsDatabase.json")
 	if err := databaseConfig.Update(&ci.CM); err != nil {
 		return fmt.Errorf("could not read clientsDatabase.json file %w", err)
 	}
@@ -89,7 +90,7 @@ func InitHandler(ci *config.PolicyConfigurationManager, r *router.RadiusRouter) 
 	err = dbHandle.Ping()
 	if err != nil {
 		// If the database is not available, die
-		config.GetLogger().Errorf("could not ping database %s %s", dbCfg.Driver, dbCfg.Url)
+		core.GetLogger().Errorf("could not ping database %s %s", dbCfg.Driver, dbCfg.Url)
 		panic("could not ping database")
 	}
 
@@ -100,36 +101,34 @@ func InitHandler(ci *config.PolicyConfigurationManager, r *router.RadiusRouter) 
 	// These configuration items are updateable
 
 	// Global configuration
-	handlerConfig = config.NewConfigObject[HandlerConfig]("globalConfig.json")
+	handlerConfig = core.NewConfigObject[HandlerConfig]("globalConfig.json")
 	if err = handlerConfig.Update(&ci.CM); err != nil {
 		return fmt.Errorf("could not read globalConfig.json: %w", err)
 	}
 	hc := handlerConfig.Get()
 
 	// special users
-	specialUsers = config.NewConfigObject[handler.RadiusUserFile]("specialUsers.json")
+	specialUsers = core.NewConfigObject[handler.RadiusUserFile]("specialUsers.json")
 	if err = specialUsers.Update(&ci.CM); err != nil {
 		return fmt.Errorf("could not get special users configuration: %w", err)
 	}
 
 	// Realm config
-	realms = config.NewConfigObject[handler.RadiusUserFile]("realms.json")
+	realms = core.NewConfigObject[handler.RadiusUserFile]("realms.json")
 	if err = realms.Update(&ci.CM); err != nil {
 		return fmt.Errorf("could not get realm configuration: %w", err)
 	}
 
 	// Service configuration
-	basicProfiles = config.NewTemplatedConfigObject[handler.RadiusUserFile, PlanTemplateParams]("basicProfiles.txt", "planparameters")
+	basicProfiles = core.NewTemplatedConfigObject[handler.RadiusUserFile, PlanTemplateParams]("basicProfiles.txt", "planparameters")
 	if err = basicProfiles.Update(&ci.CM); err != nil {
 		return fmt.Errorf("could not get basic profiles: %w", err)
 	}
 
-	addonProfiles = config.NewConfigObject[handler.RadiusUserFile]("addonProfiles.json")
-	if err = addonProfiles.Update(&ci.CM); err != nil {
+	profiles = core.NewConfigObject[handler.RadiusUserFile]("profiles.json")
+	if err = profiles.Update(&ci.CM); err != nil {
 		return fmt.Errorf("could not get addon profiles: %w", err)
 	}
-
-	fmt.Printf("%v\n", basicProfiles)
 
 	// Radius Checks
 	radiusCheckers, err = handler.NewRadiusPacketChecks("radiusCheckers.json", ci)
@@ -210,23 +209,23 @@ func CloseHandler() {
 }
 
 // Main entry point
-func RequestHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
+func RequestHandler(request *core.RadiusPacket) (*core.RadiusPacket, error) {
 
 	// Get my copy of the configuration
 	var handlerConfig = handlerConfig.Get()
 
-	hl := config.NewHandlerLogger()
+	hl := core.NewHandlerLogger()
 	l := hl.L
 	l.Debug("")
 
-	defer func(h *config.HandlerLogger) {
+	defer func(h *core.HandlerLogger) {
 		h.L.Debug("---[END REQUEST]-----")
 		h.L.Debug("")
 		h.WriteLog()
 	}(hl)
 
 	l.Debug("---[START REQUEST]-----")
-	if config.IsDebugEnabled() {
+	if core.IsDebugEnabled() {
 		l.Debug(request.String())
 	}
 
@@ -317,14 +316,14 @@ func RequestHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacke
 	var realmConfig handler.Properties = realmEntry.ConfigItems
 	requestConfig := handlerConfig.OverrideWith(clientConfig.OverrideWith(realmConfig), hl)
 
-	if config.IsDebugEnabled() {
+	if core.IsDebugEnabled() {
 		l.Debugf("global config: %s", handlerConfig)
 		l.Debugf("realm config: %s", realmConfig)
 		l.Debugf("client config: %s", clientConfig)
 		l.Debugf("merged config: %s", requestConfig)
 	}
 
-	// Merge the reply attributes. Priority is realm > global
+	// Merge the reply attributes. Priority is realm > client > global
 	// TODO: Get attributes from radius client
 	var radiusAttributes handler.AVPItems = handlerConfig.RadiusAttrs
 	radiusAttributes = radiusAttributes.OverrideWith(realmEntry.ReplyItems)
@@ -332,7 +331,7 @@ func RequestHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacke
 	var noRadiusAttributes handler.AVPItems = handlerConfig.NonOverridableRadiusAttrs
 	noRadiusAttributes = realmEntry.NonOverridableReplyItems.Add(handlerConfig.NonOverridableRadiusAttrs)
 
-	if config.IsDebugEnabled() {
+	if core.IsDebugEnabled() {
 		l.Debugf("handler attributes: %s", handlerConfig.RadiusAttrs)
 		l.Debugf("realm attributes: %s", realmEntry.ReplyItems)
 		l.Debugf("merged attributes: %s", radiusAttributes)
@@ -356,9 +355,9 @@ func RequestHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacke
 
 	// Call the corresponding handler
 	switch request.Code {
-	case radiuscodec.ACCESS_REQUEST:
+	case core.ACCESS_REQUEST:
 		return AccessRequestHandler(request, &ctx, hl)
-	case radiuscodec.ACCOUNTING_REQUEST:
+	case core.ACCOUNTING_REQUEST:
 		// To avoid issues when sending packets in copy mode
 		var wg sync.WaitGroup
 		resp, err := AccountingRequestHandler(request, &ctx, hl, &wg)

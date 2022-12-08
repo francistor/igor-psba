@@ -2,14 +2,14 @@ package psbahandlers
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
-	"github.com/francistor/igor/config"
-	"github.com/francistor/igor/radiuscodec"
+	"github.com/francistor/igor/core"
 )
 
 // Void Handler
-func VoidHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
+func VoidHandler(request *core.RadiusPacket) (*core.RadiusPacket, error) {
 	return nil, nil
 }
 
@@ -17,11 +17,11 @@ func VoidHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, 
 // Echoes everything.
 // If username is "reject", does reject
 // If username is "drop", returns error
-func SuperserverHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
-	hl := config.NewHandlerLogger()
+func SuperserverHandler(request *core.RadiusPacket) (*core.RadiusPacket, error) {
+	hl := core.NewHandlerLogger()
 	l := hl.L
 
-	defer func(l *config.HandlerLogger) {
+	defer func(l *core.HandlerLogger) {
 		l.WriteLog()
 	}(hl)
 
@@ -29,17 +29,19 @@ func SuperserverHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusP
 
 	userName := request.GetStringAVP("User-Name")
 
-	var response *radiuscodec.RadiusPacket
+	var response *core.RadiusPacket
 	if userName == "drop" {
 		return nil, fmt.Errorf("username was <drop>")
 	}
-	if userName == "reject" {
-		response = radiuscodec.NewRadiusResponse(request, false)
+
+	// Access-Reject does not mirror or include attributes other than Reply-Message
+	if strings.HasPrefix(userName, "reject") {
+		response = core.NewRadiusResponse(request, false)
 		response.Add("Reply-Message", "rejected by upstream server")
 		return response, nil
 	}
 
-	response = radiuscodec.NewRadiusResponse(request, true)
+	response = core.NewRadiusResponse(request, true)
 
 	// Echo all attributes
 	for i := range request.AVPs {
@@ -56,11 +58,11 @@ func SuperserverHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusP
 }
 
 // Send all request to super-server
-func ProxyHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
-	hl := config.NewHandlerLogger()
+func ProxyHandler(request *core.RadiusPacket) (*core.RadiusPacket, error) {
+	hl := core.NewHandlerLogger()
 	l := hl.L
 
-	defer func(l *config.HandlerLogger) {
+	defer func(l *core.HandlerLogger) {
 		l.WriteLog()
 	}(hl)
 
