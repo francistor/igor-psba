@@ -83,9 +83,10 @@ func InitHandler(ci *core.PolicyConfigurationManager, r *router.RadiusRouter) er
 	if err != nil {
 		return fmt.Errorf("could not create database object %w", err)
 	}
-	fmt.Println(dbCfg.MaxOpenConns)
 	dbHandle.SetMaxOpenConns(dbCfg.MaxOpenConns)
-	dbHandle.SetMaxIdleConns(dbCfg.MaxIdleConns)
+	// By default, idle connections is two, and connections are closed and established again, making easy to hit the
+	// operating system limit on number of ports available
+	dbHandle.SetMaxIdleConns(dbCfg.MaxOpenConns)
 
 	// Check the database connection
 	err = dbHandle.Ping()

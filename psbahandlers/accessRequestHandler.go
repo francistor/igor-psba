@@ -366,13 +366,14 @@ func (p *NullableClientPoU) toPoU() ClientPoU {
 }
 
 // Helper function to get the client from the database
+// Will return an empty ClientPoU if not found
 func findDBClient(userName string, accessPort int64, accessId string, hl *core.HandlerLogger) (ClientPoU, error) {
 
 	l := hl.L
 
 	// Find the user
 	clientpou := NullableClientPoU{}
-	stmt, err := dbHandle.Prepare(`select 
+	row := dbHandle.QueryRow(`select 
 	clients.ClientId, 
 	ExternalClientId, 
 	ISP, 
@@ -393,46 +394,30 @@ func findDBClient(userName string, accessPort int64, accessId string, hl *core.H
 	IPv6WANPrefix,
 	AccessType,
 	CheckType
-	from clients, pou where clients.ClientId = pou.ClientId and accessId = ? and accessPort = ?`)
-	if err != nil {
-		l.Error(err.Error())
-		return ClientPoU{}, err
-	}
-	defer stmt.Close()
-	rows, err := stmt.Query(accessId, accessPort)
-	if err != nil {
-		return ClientPoU{}, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		err := rows.Scan(
-			&clientpou.ClientId,
-			&clientpou.ExternalClientId,
-			&clientpou.ISP,
-			&clientpou.PlanName,
-			&clientpou.BlockingStatus,
-			&clientpou.PlanOverride,
-			&clientpou.PlanOverrideExpDate,
-			&clientpou.AddonProfileOverride,
-			&clientpou.AddonProfileOverrideExpDate,
-			&clientpou.NotificationExpDate,
-			&clientpou.Parameters,
-			&clientpou.AccessPort,
-			&clientpou.AccessId,
-			&clientpou.UserName,
-			&clientpou.Password,
-			&clientpou.IPv4Address,
-			&clientpou.IPv6DelegatedPrefix,
-			&clientpou.IPv6WANPrefix,
-			&clientpou.AccessType,
-			&clientpou.CheckType,
-		)
-		if err != nil {
-			l.Error(err.Error())
-			return ClientPoU{}, err
-		}
-	}
-	err = rows.Err()
+	from clients, pou where clients.ClientId = pou.ClientId and accessId = ? and accessPort = ?`, accessId, accessPort)
+
+	err := row.Scan(
+		&clientpou.ClientId,
+		&clientpou.ExternalClientId,
+		&clientpou.ISP,
+		&clientpou.PlanName,
+		&clientpou.BlockingStatus,
+		&clientpou.PlanOverride,
+		&clientpou.PlanOverrideExpDate,
+		&clientpou.AddonProfileOverride,
+		&clientpou.AddonProfileOverrideExpDate,
+		&clientpou.NotificationExpDate,
+		&clientpou.Parameters,
+		&clientpou.AccessPort,
+		&clientpou.AccessId,
+		&clientpou.UserName,
+		&clientpou.Password,
+		&clientpou.IPv4Address,
+		&clientpou.IPv6DelegatedPrefix,
+		&clientpou.IPv6WANPrefix,
+		&clientpou.AccessType,
+		&clientpou.CheckType,
+	)
 	if err != nil {
 		l.Error(err.Error())
 		return ClientPoU{}, err

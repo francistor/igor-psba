@@ -14,7 +14,7 @@ type DatabaseConfig struct {
 	Url          string
 	Driver       string
 	MaxOpenConns int
-	MaxIdleConns int
+	// MaxIdleConns is evil. Connections are closed instead of being reused constantly
 }
 
 type PlanTemplateParams struct {
