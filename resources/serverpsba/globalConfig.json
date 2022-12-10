@@ -67,6 +67,7 @@
 
 	"realmProfile": "",
 
+	"notificationProfile": "notification",
 	"notificationIsAddon": true,
 
 	"radiusAttrs":[

@@ -12,6 +12,7 @@ import (
 
 func AccessRequestHandler(request *core.RadiusPacket, ctx *RequestContext, hl *core.HandlerLogger) (*core.RadiusPacket, error) {
 
+	var err error
 	now := time.Now()
 
 	// For logging
@@ -22,20 +23,52 @@ func AccessRequestHandler(request *core.RadiusPacket, ctx *RequestContext, hl *c
 	// Profiles to assign. The model specifies a mandatory basic profile and an optional addon profile
 	var basicProfile string
 	var addonProfile string
-	// Attributes from upstream server
+	// The planName to assign to the client, taking into account the possible override
+	var planName string
+	// Attributes from upstream server. Initially empty
 	var proxyRadiusAttrs = make([]core.RadiusAVP, 0)
 
 	// Find the user
-	clientpou, err := findClient(ctx.userName, ctx.accessPort, ctx.accessId, hl)
-	if err != nil {
-		// No answer
-		return nil, err
+	var clientpou ClientPoU
+	if ctx.config.ProvisionType == "database" {
+		clientpou, err = findDBClient(ctx.userName, ctx.accessPort, ctx.accessId, hl)
+		if err != nil {
+			// No answer
+			return nil, err
+		}
+	} else if ctx.config.ProvisionType == "file" {
+		// Uses username to find the user in the specialUsers config file
+		userEntry, found := specialUsers.Get()[ctx.userName]
+		if found {
+			clientpou.ClientId = -1 // To signal that the client was found
+			clientpou.AccessId = ctx.accessId
+			clientpou.AccessPort = ctx.accessPort
+			clientpou.UserName = ctx.userName
+			clientpou.PlanName = userEntry.CheckItems["planName"]
+			clientpou.ExternalClientId = userEntry.CheckItems["externalClientId"]
+
+			// Add radius attributes
+			if core.IsDebugEnabled() {
+				l.Debugf("adding special client radius attributes %s", userEntry.ReplyItems)
+				l.Debugf("adding special client no-radius attributes %s", userEntry.NonOverridableReplyItems)
+			}
+			ctx.radiusAttributes = ctx.radiusAttributes.OverrideWith(userEntry.ReplyItems)
+			ctx.noRadiusAttributes = ctx.noRadiusAttributes.Add(userEntry.NonOverridableReplyItems)
+		}
+	} else if ctx.config.ProvisionType != "none" {
+		return nil, fmt.Errorf("unknown provision type %s", ctx.config.ProvisionType)
+	}
+
+	// Set the plan name, which may be overriden later
+	planName = clientpou.PlanName
+	// If the user has a plan, let's assign here the initial basic profile
+	if planName != "" {
+		basicProfile = standardBasicProfileName
 	}
 
 	// Actions if user not found
 	if clientpou.ClientId != 0 {
 		l.Debugf("client found %#v\n", clientpou)
-		basicProfile = standardBasicProfileName
 	} else {
 		l.Debug("client not found\n")
 		// If permissiveProfile is defined, we assign that one. Otherwise, signal rejection
@@ -52,6 +85,7 @@ func AccessRequestHandler(request *core.RadiusPacket, ctx *RequestContext, hl *c
 
 	// Authenticate user
 	switch ctx.config.AuthLocal {
+	// Use the data taken while looking after the user
 	case "provision":
 		// Check only if provisioned password
 		if clientpou.Password != "" {
@@ -67,54 +101,71 @@ func AccessRequestHandler(request *core.RadiusPacket, ctx *RequestContext, hl *c
 		if clientpou.UserName != "" {
 			if ctx.userName != strings.ToLower(clientpou.UserName) {
 				l.Debugf("incorrect login")
-				rejectReason = "login unmatch (provision) for " + clientpou.UserName
+				rejectReason = "login unmatch (provision) for: " + ctx.userName + "provisioned: " + clientpou.UserName
 			}
 		} else {
 			l.Debugf("not verifying unprovisioned login")
 		}
+	// Lookup the password in a file
 	case "file":
-		if userEntry, found := specialUsers.Get()[clientpou.UserName]; found {
+		if userEntry, found := specialUsers.Get()[ctx.userName]; found {
 			if request.GetPasswordStringAVP("User-Password") != userEntry.CheckItems["password"] {
 				l.Debugf("incorrect password")
-				rejectReason = "Authorization rejected (file) for " + clientpou.UserName
+				rejectReason = "Authorization rejected (file) for " + ctx.userName
 			}
 		} else {
-			l.Debugf("%s not found in special users file", clientpou.UserName)
-			rejectReason = clientpou.UserName + "not found"
+			l.Debugf("%s not found in special users file", ctx.userName)
+			rejectReason = ctx.userName + "not found"
 		}
+	case "none":
+		// Do nothing
 	default:
+		return nil, fmt.Errorf("bad authlocal type <%s>", ctx.config.AuthLocal)
 	}
 
 	if rejectReason == "" {
-		// Priorities are (from low to high)
-		// Notification --> clientOverrides --> blocked --> realmOverride (--> rejectOverrides)
-
 		// Apply overrides and calculate basic service and addon
+		// Priorities are (from low to high)
+		// PlanOverride --> Notification  --> Addon Override --> blocked --> realmOverride (--> rejectOverrides)
+
+		// Plan override
+		if clientpou.PlanOverrideExpDate.After(now) && clientpou.PlanOverride != "" {
+			planName = clientpou.PlanOverride
+			l.Debugf("overriding plan to <%s>", planName)
+		}
 
 		// Notification overrides
 		if clientpou.NotificationExpDate.After(now) {
 			if ctx.config.NotificationIsAddon {
-				addonProfile = "notification"
+				addonProfile = ctx.config.NotificationProfile
 				l.Debugf("applying notification addon <%s>", addonProfile)
 			} else {
-				basicProfile = "notification"
-				l.Debugf("applying notification basic profile <%s>", basicProfile)
+				basicProfile = ctx.config.NotificationProfile
+				addonProfile = ""
+				l.Debugf("applying notification basic profile <%s> and deleting addon profile", basicProfile)
 			}
 		}
-		// Client overrides
-		if clientpou.AddonProfileOverrideExpDate.After(now) {
+
+		// Addon override
+		if clientpou.AddonProfileOverrideExpDate.After(now) && clientpou.AddonProfileOverride != "" {
 			addonProfile = clientpou.AddonProfileOverride
 			l.Debugf("applying client addon <%s>", addonProfile)
 		}
+
 		// Blocking overrides
-		// TODO: Apply blocking timeout
 		if clientpou.BlockingStatus == 2 {
-			if ctx.config.BlockingIsAddon {
-				addonProfile = ctx.config.BlockingProfile
-				l.Debugf("applying blocking addon <%s>", addonProfile)
+			if ctx.config.BlockingProfile != "" {
+				if ctx.config.BlockingIsAddon {
+					addonProfile = ctx.config.BlockingProfile
+					l.Debugf("applying blocking addon <%s>", addonProfile)
+				} else {
+					basicProfile = ctx.config.BlockingProfile
+					addonProfile = ""
+					l.Debugf("applying blocking basic profile <%s> and deleting addon profile", basicProfile)
+				}
 			} else {
-				basicProfile = ctx.config.BlockingProfile
-				l.Debugf("applying blocking basic profile <%s>", basicProfile)
+				// If no blocking profile, reject user
+				rejectReason = "blocked user"
 			}
 		}
 		// Realm override
@@ -184,6 +235,7 @@ func AccessRequestHandler(request *core.RadiusPacket, ctx *RequestContext, hl *c
 			return response, nil
 		}
 
+		// The reject profile cannot be an addon
 		l.Debugf("applying reject basic profile <%s>", basicProfile)
 		basicProfile = ctx.config.RejectProfile
 		addonProfile = ""
@@ -192,21 +244,23 @@ func AccessRequestHandler(request *core.RadiusPacket, ctx *RequestContext, hl *c
 	// Compose final response
 
 	// Get the basic profile radius attributes
-	l.Debugf("composing final response with basicProfile <%s> and addonProfile <%s>", basicProfile, addonProfile)
+	l.Debugf("composing final response with plan <%s> basicProfile <%s> and addonProfile <%s>", planName, basicProfile, addonProfile)
 
 	var basicProfileRadiusAttrs handler.AVPItems
 	var basicProfileNoRadiusAttrs handler.AVPItems
-	if basicProfile == standardBasicProfileName {
+	// Add attributes for the basic profile, but only if the client has a plan (special users may lack a Plan)
+
+	if basicProfile == standardBasicProfileName && planName != "" {
 		// If the basic profile is that of the Internet service, take the parametrization from the basicProfiles
-		basicProfileForPlan, err := basicProfiles.GetKey(clientpou.PlanName)
+		basicProfileForPlan, err := basicProfiles.GetKey(planName)
 		if err != nil {
-			l.Errorf("plan %s not found", clientpou.PlanName)
-			return nil, fmt.Errorf("plan %s not found", clientpou.PlanName)
+			l.Errorf("plan %s not found", planName)
+			return nil, fmt.Errorf("plan %s not found", planName)
 		}
 		basicProfileRadiusAttrs = basicProfileForPlan[standardBasicProfileName].ReplyItems
 		basicProfileNoRadiusAttrs = basicProfileForPlan[standardBasicProfileName].NonOverridableReplyItems
 	} else {
-		l.Info(profiles.Get())
+		// basic profile was overriden due to some special condition
 		basicProfileRadiusAttrs = profiles.Get()[basicProfile].ReplyItems
 		basicProfileNoRadiusAttrs = profiles.Get()[basicProfile].NonOverridableReplyItems
 	}
@@ -236,7 +290,7 @@ func AccessRequestHandler(request *core.RadiusPacket, ctx *RequestContext, hl *c
 	noRadiusAttributes := ctx.noRadiusAttributes.Add(basicProfileNoRadiusAttrs).Add(addonProfileNoRadiusAttrs)
 
 	// Compose and add class attribute
-	classAttrs := []string{fmt.Sprintf("P:%s", clientpou.PlanName), fmt.Sprintf("C:%s", clientpou.ExternalClientId)}
+	classAttrs := []string{fmt.Sprintf("P:%s", planName), fmt.Sprintf("C:%s", clientpou.ExternalClientId)}
 	if addonProfile != "" {
 		classAttrs = append(classAttrs, fmt.Sprintf("A:%s", addonProfile))
 	}
@@ -312,7 +366,7 @@ func (p *NullableClientPoU) toPoU() ClientPoU {
 }
 
 // Helper function to get the client from the database
-func findClient(userName string, accessPort int64, accessId string, hl *core.HandlerLogger) (ClientPoU, error) {
+func findDBClient(userName string, accessPort int64, accessId string, hl *core.HandlerLogger) (ClientPoU, error) {
 
 	l := hl.L
 
@@ -344,6 +398,7 @@ func findClient(userName string, accessPort int64, accessId string, hl *core.Han
 		l.Error(err.Error())
 		return ClientPoU{}, err
 	}
+	defer stmt.Close()
 	rows, err := stmt.Query(accessId, accessPort)
 	if err != nil {
 		return ClientPoU{}, err

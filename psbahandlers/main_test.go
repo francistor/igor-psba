@@ -1,4 +1,4 @@
-package psbatest
+package psbahandlers
 
 import (
 	"crypto/tls"
@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/francistor/igor-psba/psbahandlers"
 	"golang.org/x/net/http2"
 
 	"github.com/francistor/igor/core"
@@ -41,15 +40,15 @@ func TestMain(m *testing.M) {
 	core.InitPolicyConfigInstance(bootstrapFile, "superserverpsba", false)
 
 	// Initialize the routers
-	clientRouter = router.NewRadiusRouter("clientpsba", psbahandlers.VoidHandler)
-	serverRouter = router.NewRadiusRouter("serverpsba", psbahandlers.RequestHandler)
-	superserverRouter = router.NewRadiusRouter("superserverpsba", psbahandlers.SuperserverHandler)
+	clientRouter = router.NewRadiusRouter("clientpsba", VoidHandler)
+	serverRouter = router.NewRadiusRouter("serverpsba", RequestHandler)
+	superserverRouter = router.NewRadiusRouter("superserverpsba", SuperserverHandler)
 
 	// Initialize a router in the client
 	clientHttpRouter = httprouter.NewHttpRouter("clientpsba", nil, clientRouter)
 
 	// Initialize handler for the server. The superserver will use test Handlers that do not require initialization
-	if err := psbahandlers.InitHandler(serverCInstance, serverRouter); err != nil {
+	if err := InitHandler(serverCInstance, serverRouter); err != nil {
 		panic(err)
 	}
 
@@ -83,7 +82,7 @@ func TestMain(m *testing.M) {
 	clientHttpRouter.Close()
 	clientRouter.Close()
 
-	psbahandlers.CloseHandler()
+	CloseHandler()
 
 	os.Exit(exitCode)
 }

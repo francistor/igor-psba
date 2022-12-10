@@ -25,6 +25,32 @@
 		]
 	},
 
+	"database.provision.nopermissive.doreject.block_addon.noproxy":{
+		"configItems": {
+			"provisionType": "database",
+			"authLocal": "provision",
+
+			"permissiveProfile": "",
+			"rejectProfile": "",
+
+			"blockingProfile": "pcautiv",
+			"blockingIsAddon": "true",
+
+			"writeServiceCDR": "true",
+			"writeSessionCDR": "true",
+
+			"proxyGroupName": "",
+			"authProxyFilterOut": "altProxyOut",
+			"authProxyFilterIn": "altProxyIn"
+		},
+		"replyItems": [
+			{"Unisphere-Virtual-Router": "vrouter-1"}
+		],
+		"nonOverridableReplyItems": [
+			{"Cisco-AVPair": "realm=database.provision.nopermissive.doreject.block_addon.proxy"}
+		]
+	},
+
 	"database.provision.nopermissive.noreject.block_basic.proxy":{
 		"configItems": {
 			"provisionType": "database",
@@ -74,6 +100,78 @@
 		"nonOverridableReplyItems": [
 			{"Cisco-AVPair": "realm=database.provision.permissive.noreject.block_basic.proxy"}
 		]
-	}
+	},
+	"file.provision.permissive.noreject.block_basic.noproxy":{
+		"configItems": {
+			"provisionType": "file",
+			"authLocal": "provision",
 
+			"permissiveProfile": "permissive",
+			"rejectProfile": "reject",
+
+			"blockingProfile": "pcautiv",
+			"blockingIsAddon": "false",
+
+			"writeServiceCDR": "true",
+			"writeSessionCDR": "true",
+
+			"proxyGroupName": ""
+		},
+		"replyItems": [
+			{"Unisphere-Virtual-Router": "vrouter-4"}
+		],
+		"nonOverridableReplyItems": [
+			{"Cisco-AVPair": "realm=file.provision.permissive.noreject.block_basic.noproxy"}
+		]
+	},
+	"database.file.nopermissive.reject.block_reject.noproxy.betatester":{
+		"__doc": "betatester, no change in speed",
+		"configItems": {
+			"provisionType": "database",
+			"authLocal": "file",
+
+			"permissiveProfile": "",
+			"rejectProfile": "",
+
+			"blockingProfile": "",
+			"blockingIsAddon": "false",
+
+			"writeServiceCDR": "true",
+			"writeSessionCDR": "true",
+
+			"proxyGroupName": ""
+		},
+		"replyItems": [
+			{"Unisphere-Virtual-Router": "vrouter-5"}
+		],
+		"nonOverridableReplyItems": [
+			{"Cisco-AVPair": "realm=database.file.nopermissive.reject.block_reject.noproxy.betatester"}
+		]
+	},
+	"database.file.nopermissive.reject.block_reject.noproxy.speedy":{
+		"__doc": "speedy. Profile is overriden with one with maximum speed",
+		"configItems": {
+			"provisionType": "database",
+			"authLocal": "file",
+
+			"permissiveProfile": "",
+			"rejectProfile": "",
+
+			"blockingProfile": "",
+			"blockingIsAddon": "false",
+
+			"writeServiceCDR": "true",
+			"writeSessionCDR": "true",
+
+			"proxyGroupName": "",
+
+			"realmProfile": "speedy"
+		},
+		"replyItems": [
+			{"Unisphere-Virtual-Router": "vrouter-5"}
+		],
+		"nonOverridableReplyItems": [
+			{"Cisco-AVPair": "realm=database.file.nopermissive.reject.block_reject.noproxy.speedy"}
+		]
+	}
 }

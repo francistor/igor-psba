@@ -83,6 +83,7 @@ func InitHandler(ci *core.PolicyConfigurationManager, r *router.RadiusRouter) er
 	if err != nil {
 		return fmt.Errorf("could not create database object %w", err)
 	}
+	fmt.Println(dbCfg.MaxOpenConns)
 	dbHandle.SetMaxOpenConns(dbCfg.MaxOpenConns)
 	dbHandle.SetMaxIdleConns(dbCfg.MaxIdleConns)
 

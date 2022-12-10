@@ -1,6 +1,6 @@
 {
     "coreLogConfig":{
-        "level": "debug",
+        "level": "info",
         "development": true,
         "encoding": "console",
         "outputPaths": ["stdout"],
@@ -18,7 +18,7 @@
         }
     },
     "handlerLogConfig": {
-        "level": "debug",
+        "level": "info",
         "development": true,
         "encoding": "console",
         "outputPaths": ["stdout"],

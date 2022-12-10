@@ -98,6 +98,7 @@ type HandlerConfig struct {
 	RealmProfile string
 
 	// Advertising service could be basic
+	NotificationProfile string
 	NotificationIsAddon bool
 
 	// Global Radius attributes to send
@@ -205,6 +206,8 @@ func (g HandlerConfig) OverrideWith(props handler.Properties, hl *core.HandlerLo
 			}
 		case "realmprofile":
 			g.RealmProfile = props[key]
+		case "notificationprofile":
+			g.NotificationProfile = props[key]
 		case "notificationisaddon":
 			if v, err := strconv.ParseBool(props[key]); err == nil {
 				g.NotificationIsAddon = v

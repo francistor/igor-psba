@@ -1,11 +1,41 @@
 {
-	"user_0@file.provision.p0.r0.bb": {
+	"user1@file.provision.permissive.noreject.block_basic.noproxy": {
 		"checkItems":{
-			"password": "password!_0",
-			"legacyClientId": "legacy_0",
-			"phone": "phone_0",
-			"basicServiceName": "service_0",
-			"status": "0"
+			"password": "francisco",
+			"externalClientId": "ExternalUser1",
+			"blockingStatus": "0"
+		},
+		"replyItems":[
+			{"Filter-Id": "user1@file"}
+		],
+		"nonOverridableReplyItems":[
+			{"Idle-Timeout": "3600"}
+		]
+	},
+	"user2@file.provision.permissive.noreject.block_basic.noproxy": {
+		"checkItems":{
+			"password": "secret",
+			"externalClientId": "ExternalUser2",
+			"planName": "Plan1",
+			"blockingStatus": "0"
+		},
+		"replyItems":[
+			{"Filter-Id": "user2@file"}
+		],
+		"nonOverridableReplyItems":[
+			{"Idle-Timeout": "3600"}
+		]
+	},
+
+	"betatester@database.file.nopermissive.reject.block_reject.noproxy.betatester":{
+		"checkItems":{
+			"password": "secret"
+		}
+	},
+
+	"speedy@database.file.nopermissive.reject.block_reject.noproxy.speedy":{
+		"checkItems":{
+			"password": "secret"
 		}
 	},
 

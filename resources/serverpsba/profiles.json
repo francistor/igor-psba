@@ -27,12 +27,21 @@
 		]
 	},
 
-	"addon_1":{
+	"speedy":{
 		"replyItems":[
-			{"Session-Timeout": "300"}
+			{"Unisphere-Service-Bundle": "Aspeedy"}
 		],
 		"nonOverridablereplyItems":[
-			{"HW-Account-Info": "Aaddon_1"}
+			{"HW-Account-Info": "Aspeedy"}
+		]
+	},
+
+	"notification":{
+		"replyItems":[
+			{"Unisphere-Service-Bundle": "Apubli"}
+		],
+		"nonOverridablereplyItems":[
+			{"HW-Account-Info": "Apubli"}
 		]
 	},
 
@@ -73,15 +82,5 @@
 		"nonOverridablereplyItems":[
 			{"HW-Account-Info": "Aacs"}
 		]
-	},
-	
-	"betatester":{
-		"replyItems":[
-			{"Unisphere-Service-Bundle": "Abetatester"}
-		],
-		"nonOverridablereplyItems":[
-			{"HW-Account-Info": "Abetatester"}
-		]
 	}
-	
 }

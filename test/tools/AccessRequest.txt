@@ -1,0 +1,4 @@
+User-Name = "francisco@database.provision.nopermissive.doreject.block_addon.noproxy"
+User-Password = "francisco"
+NAS-Port = 1
+NAS-IP-Address = "127.0.0.1"
