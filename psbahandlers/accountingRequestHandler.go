@@ -64,14 +64,14 @@ func AccountingRequestHandler(request *core.RadiusPacket, ctx *RequestContext, h
 
 			// Do proxy asycnronously
 			wg.Add(1)
-			go func() {
+			go func(ct CopyTarget) {
 				defer wg.Done()
 				if _, err := radiusRouter.RouteRadiusRequest(reqCopy, ct.ProxyGroupName, time.Duration(ct.ProxyTimeoutMillis)*time.Millisecond, 1+ct.ProxyRetries, 1+ct.ProxyServerRetries, ""); err != nil {
 					core.GetLogger().Warnf("error sending copy to %s: %s", ct.ProxyGroupName, err)
 				} else {
 					l.Debugf("proxy done")
 				}
-			}()
+			}(ct)
 
 		} else {
 			l.Debugf("skipping target %s", ct.TargetName)

@@ -24,11 +24,10 @@ var http2Client http.Client
 
 var testInvoker TestInvoker
 
-func TestMain(m *testing.M) {
+var sessionCDRDir = os.Getenv("IGOR_BASE") + "/cdr/session"
+var serviceCDRDir = os.Getenv("IGOR_BASE") + "/cdr/service"
 
-	// Clean cdr files
-	os.RemoveAll(os.Getenv("IGOR_BASE") + "/cdr/session")
-	os.RemoveAll(os.Getenv("IGOR_BASE") + "/cdr/service")
+func TestMain(m *testing.M) {
 
 	bootstrapFile := "resources/searchRules.json"
 
@@ -46,6 +45,10 @@ func TestMain(m *testing.M) {
 
 	// Initialize a router in the client
 	clientHttpRouter = httprouter.NewHttpRouter("clientpsba", nil, clientRouter)
+
+	// Clean cdr files
+	os.RemoveAll(sessionCDRDir)
+	os.RemoveAll(serviceCDRDir)
 
 	// Initialize handler for the server. The superserver will use test Handlers that do not require initialization
 	if err := InitHandler(serverCInstance, serverRouter); err != nil {

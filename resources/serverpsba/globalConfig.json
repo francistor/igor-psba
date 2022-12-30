@@ -12,7 +12,7 @@
 			"path": "/home/francisco/igor-psba/cdr/service",
 			"fileNamePattern": "cdr_2006-01-02T15-04.txt",
 			"format": "livingstone",
-			"attributes":"User-Name,NAS-Port,NAS-IP-Address,PSA-AccessId,PSA-AccessPort,PSA-MAC-Address",
+			"attributes":"User-Name,NAS-Port,NAS-IP-Address,PSA-AccessId,PSA-AccessPort,PSA-MAC-Address,PSA-ServiceName",
 			"checkerName": "serviceAccounting",
 			"rotateSeconds": 60
 		}
@@ -21,7 +21,7 @@
 	"writeSessionCDR": true,
 	"writeServiceCDR": true,
 
-	"copyTargets":[
+	"_copyTargets":[
 		{
 			"targetName": "session-copy",
 			"proxyGroupName": "psba-superserver-group",

@@ -1,0 +1,6 @@
+Class = "myClass"
+NAS-Port = 1
+NAS-IP-Address = "127.0.0.1"
+Acct-Session-Id = "accounting-session-id-1"
+Acct-Status-Type= "Start"
+User-Name= "TestUser"

@@ -20,6 +20,13 @@ echo AccountingRequest
 echo
 
 echo Class = \"myClass\" > $REQUESTFILE
+echo NAS-Port = 1 >> $REQUESTFILE
+echo NAS-IP-Address = \"127.0.0.1\" >> $REQUESTFILE
+echo Acct-Session-Id = \"accounting-session-id-1\" >> $REQUESTFILE
+echo Acct-Status-Type= \"Start\" >> $REQUESTFILE
+echo User-Name= \"TestUser\" >> $REQUESTFILE
+# Comment out this for session accounting
+#echo Huawei-Service-Info = \"Abasic\" >> $REQUESTFILE
 
 # Send the packet
 # -overlap <number of simultaneous requests>
