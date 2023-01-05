@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 
 	"github.com/francistor/igor/core"
@@ -15,13 +14,6 @@ import (
 )
 
 func main() {
-
-	// Set the environment if not already set
-	if os.Getenv("IGOR_BASE") == "" {
-		ex, _ := os.Executable()
-		os.Setenv("IGOR_BASE", filepath.Dir(ex)+"/")
-		fmt.Printf("Base location: %s\n", os.Getenv("IGOR_BASE"))
-	}
 
 	// defer profile.Start(profile.BlockProfile).Stop()
 

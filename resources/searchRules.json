@@ -2,7 +2,7 @@
     "rules": [
         {"nameRegex": "(planparameters)",       "origin": "database:planParameters:PlanName:Parameters"},
         {"nameRegex": "(extradiusclients)",     "origin": "database:accessNodes:AccessNodeId:Parameters"},
-        {"nameRegex": "(.*)",     "origin": "resources/"}
+        {"nameRegex": "(.*)",     "origin": ""}
     ],
     "db": {
         "__doc": "use loc=UTC if necessary",

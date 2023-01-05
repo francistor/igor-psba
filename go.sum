@@ -8,6 +8,8 @@ github.com/francistor/igor v0.0.0-20221207224604-ca65fcf67955 h1:n8vLzUI638gJREX
 github.com/francistor/igor v0.0.0-20221207224604-ca65fcf67955/go.mod h1:/hTJikl0C7gF4GWGsS9zNnRP4WbdLCpJr/JPkNU/3u8=
 github.com/francistor/igor v0.0.0-20221208172111-c469fa1f1713 h1:5p9qPelMIzs31NYcEZHesVqkX/YlmnmEwifeGvunuds=
 github.com/francistor/igor v0.0.0-20221208172111-c469fa1f1713/go.mod h1:/hTJikl0C7gF4GWGsS9zNnRP4WbdLCpJr/JPkNU/3u8=
+github.com/francistor/igor v0.0.0-20230105133113-1ae15a34b804 h1:5Dmzqvjs11rHwyd5IOGYJ3+u8NQ5jCRqAh+leOZG4ak=
+github.com/francistor/igor v0.0.0-20230105133113-1ae15a34b804/go.mod h1:/hTJikl0C7gF4GWGsS9zNnRP4WbdLCpJr/JPkNU/3u8=
 github.com/go-sql-driver/mysql v1.7.0 h1:ueSltNNllEqE3qcWBTD0iQd3IpL/6U+mJxLkazJ7YPc=
 github.com/go-sql-driver/mysql v1.7.0/go.mod h1:OXbVy3sEdcQ2Doequ6Z5BW6fXNQTmx+9S1MCJN5yJMI=
 github.com/pkg/errors v0.8.1 h1:iURUrRGxPUNPdy5/HRSm+Yj6okJ6UtLINN0Q9M4+h3I=

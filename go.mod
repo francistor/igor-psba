@@ -3,7 +3,7 @@ module github.com/francistor/igor-psba
 go 1.19
 
 require (
-	github.com/francistor/igor v0.0.0-20221208172111-c469fa1f1713
+	github.com/francistor/igor v0.0.0-20230105133113-1ae15a34b804
 	github.com/go-sql-driver/mysql v1.7.0
 	golang.org/x/net v0.2.0
 )

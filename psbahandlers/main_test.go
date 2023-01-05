@@ -24,8 +24,8 @@ var http2Client http.Client
 
 var testInvoker TestInvoker
 
-var sessionCDRDir = os.Getenv("IGOR_BASE") + "/cdr/session"
-var serviceCDRDir = os.Getenv("IGOR_BASE") + "/cdr/service"
+var sessionCDRDir = "cdr/session"
+var serviceCDRDir = "cdr/service"
 
 func TestMain(m *testing.M) {
 
